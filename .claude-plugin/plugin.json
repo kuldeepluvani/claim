@@ -1,0 +1,17 @@
+{
+  "name": "claim",
+  "description": "Claude AI Memory — autonomous capture, typed memories, Obsidian vault with registry-indexed knowledge store.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Kuldeep Luvani",
+    "email": "kuldeepluvani@gmail.com"
+  },
+  "homepage": "https://github.com/kuldeepluvani/claim",
+  "repository": "https://github.com/kuldeepluvani/claim",
+  "license": "MIT",
+  "keywords": ["memory", "obsidian", "vault", "persistence", "knowledge", "autonomous"],
+  "agents": ["./agents/memory-manager.md"],
+  "commands": ["./commands/claim-init.md", "./commands/claim-status.md", "./commands/claim-prune.md"],
+  "rules": ["./rules/claim-memory.md", "./rules/claim-vault.md"],
+  "skills": ["./skills/memory-prune", "./skills/vault-sync"]
+}
