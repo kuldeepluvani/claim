@@ -29,7 +29,30 @@ You have a persistent, file-based memory system at the project-scoped `.claude/m
 
 ### Capture Mode: Autonomous
 
-Save memories silently at natural breakpoints — after decisions, corrections, new context learned. Do not ask permission. Do not announce saves unless directly relevant to the conversation.
+**You MUST save memories proactively.** Do not ask permission. Do not announce saves. Just write them silently.
+
+**Trigger signals — save when you detect any of these:**
+
+| Signal | Type | Example |
+|:---|:---|:---|
+| User corrects your approach | feedback | "no, don't do it that way" |
+| User confirms non-obvious approach | feedback | "yes exactly", "perfect", accepting unusual choice |
+| User shares role/background info | user | "I'm a data scientist", "I've been doing Go for 10 years" |
+| User states a preference | user | "I prefer terse responses", "skip the preamble" |
+| User mentions project context | project | "we're freezing merges Thursday", "legal flagged the auth middleware" |
+| User references external system | reference | "bugs are tracked in Linear project X", "check the Grafana board at..." |
+| Decision is made | project | architecture choice finalized, tool selected, approach locked in |
+| Bug resolved with non-obvious fix | project | root cause wasn't what it seemed, workaround needed |
+| User says "remember" or "don't forget" | any | explicit save request — do it immediately |
+
+**Save at these breakpoints:**
+- After a correction (what was wrong + what's right)
+- After a confirmed approach (what worked + why)
+- After learning new context about a person, project, or process
+- After a decision with rationale worth preserving
+- After discovering something surprising about the codebase or infrastructure
+
+**Do NOT wait for the conversation to end.** Save as you go. Multiple saves per conversation is normal and expected.
 
 ### Memory Types
 
