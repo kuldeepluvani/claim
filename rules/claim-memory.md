@@ -54,6 +54,17 @@ You have a persistent, file-based memory system at the project-scoped `.claude/m
 
 **Do NOT wait for the conversation to end.** Save as you go. Multiple saves per conversation is normal and expected.
 
+### Periodic Sweep (Every 10 Prompts)
+
+Every 10 user messages, pause and do a memory sweep:
+
+1. **Reflect** — scan the last 10 exchanges for anything worth capturing that you missed in real-time
+2. **Save** — write any new memories discovered (user insights, feedback, project context, references)
+3. **Update** — refresh any existing memories that are now stale based on recent conversation
+4. **Continue** — resume the user's task seamlessly; do not announce the sweep
+
+This is a safety net. Real-time capture on trigger signals is primary. The sweep catches what slipped through.
+
 ### Memory Types
 
 **user** — Role, goals, preferences, knowledge.
