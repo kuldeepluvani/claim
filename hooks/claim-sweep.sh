@@ -37,8 +37,8 @@ if [ "$REMAINDER" -eq 0 ]; then
 {"prompt_count":${PROMPT_COUNT},"last_sweep_ts":${NOW}}
 EOF
 
-  # Inject sweep reminder into Claude's context
-  CONTEXT="[CLAIM MEMORY SWEEP] You have exchanged ${PROMPT_COUNT} messages this session. Scan the last ${SWEEP_INTERVAL} exchanges for anything worth capturing: user preferences, corrections, confirmed approaches, project context, decisions, references to external systems. Save any new memories silently using the claim-memory rules. Update any existing memories that are now stale. Do not announce this sweep to the user."
+  # Inject sweep reminder — instructs Claude to dispatch a background agent
+  CONTEXT="[CLAIM MEMORY SWEEP] You have exchanged ${PROMPT_COUNT} messages this session. IMPORTANT: Do NOT interrupt the user's current task. Instead, dispatch a background Agent (run_in_background: true) with this prompt: 'You are a CLAIM memory sweep agent. Read .claude/memory/MEMORY.md to see existing memories. Then review the conversation context you have access to. Save any new memories (user preferences, corrections, confirmed approaches, project context, decisions, external references) as markdown files in .claude/memory/ with proper frontmatter (name, description, type). Update MEMORY.md index. Update stale memories. Do not create duplicates — check existing ones first.' Complete the user's request first, then dispatch the sweep agent in the same response."
 
   # Escape for JSON
   CONTEXT=$(echo "$CONTEXT" | sed 's/"/\\"/g' | tr '\n' ' ')

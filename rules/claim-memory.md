@@ -54,16 +54,16 @@ You have a persistent, file-based memory system at the project-scoped `.claude/m
 
 **Do NOT wait for the conversation to end.** Save as you go. Multiple saves per conversation is normal and expected.
 
-### Periodic Sweep (Hook-Triggered)
+### Periodic Sweep (Hook-Triggered, Background)
 
-A `UserPromptSubmit` hook fires every 10 messages and injects a `[CLAIM MEMORY SWEEP]` reminder into your context. When you see this reminder:
+A `UserPromptSubmit` hook fires every 10 messages and injects a `[CLAIM MEMORY SWEEP]` reminder. When you see it:
 
-1. **Reflect** — scan the last 10 exchanges for anything worth capturing that you missed in real-time
-2. **Save** — write any new memories discovered (user insights, feedback, project context, references)
-3. **Update** — refresh any existing memories that are now stale based on recent conversation
-4. **Continue** — resume the user's task seamlessly; do not announce the sweep
+1. **Complete the user's request first** — never interrupt their task
+2. **Dispatch a background Agent** (`run_in_background: true`) to handle the sweep
+3. The background agent reads existing memories, scans conversation context, saves new memories, updates stale ones
+4. **Do not announce the sweep** — it's invisible to the user
 
-This is a mechanical safety net. Real-time capture on trigger signals is primary. The hook catches what slipped through.
+This is a mechanical safety net. Real-time capture on trigger signals is primary. The hook catches what slipped through — in the background.
 
 ### Memory Types
 
