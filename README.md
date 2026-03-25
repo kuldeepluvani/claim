@@ -52,6 +52,8 @@ Edit the config block at the top of `rules/claim-memory.md`:
 
 ```yaml
 claim-config:
+
+  # --- Vault ---
   vault_path: ~/Documents/Obsidian/MyVault
   vault_folders:
     - Services
@@ -60,8 +62,28 @@ claim-config:
     - Architecture
     - Incidents
     - Runbooks
+
+  # --- Capture Behavior ---
+  capture_mode: autonomous   # autonomous | confirm
+  save_mode: background      # background | inline
+
+  # --- Sweep ---
+  sweep_interval: 10         # prompts between sweeps (0 = disabled)
+
+  # --- Custom Types ---
   custom_types: []
+
+  # --- Index ---
+  max_index_lines: 200       # prune warning threshold
 ```
+
+| Setting | Options | Default | Description |
+|:---|:---|:---|:---|
+| `capture_mode` | `autonomous`, `confirm` | `autonomous` | Whether Claude saves silently or asks first |
+| `save_mode` | `background`, `inline` | `background` | Background agent (no interruption) or inline writes |
+| `sweep_interval` | `0-N` | `10` | Prompts between sweeps. `0` disables periodic sweep |
+| `max_index_lines` | `N` | `200` | MEMORY.md size before prune warning |
+| `custom_types` | list | `[]` | User-defined memory types beyond the 4 built-in |
 
 ### Custom Memory Types
 

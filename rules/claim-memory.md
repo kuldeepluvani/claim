@@ -7,6 +7,8 @@ alwaysApply: true
 
 <!--
 claim-config:
+
+  # --- Vault ---
   vault_path: ""
   vault_folders:
     - Services
@@ -15,21 +17,44 @@ claim-config:
     - Architecture
     - Incidents
     - Runbooks
+
+  # --- Capture Behavior ---
+  # "autonomous" = save silently without asking
+  # "confirm"    = propose memory, wait for user approval before saving
+  capture_mode: autonomous
+
+  # "background" = dispatch background Agent at end of response (no interruption)
+  # "inline"     = save directly during response (immediate but interruptive)
+  save_mode: background
+
+  # --- Sweep ---
+  # Number of prompts between periodic sweeps (0 = disabled)
+  sweep_interval: 10
+
+  # --- Custom Types ---
   custom_types: []
   # custom_types example:
   #   - name: recipe
   #     description: "Reusable patterns and solutions"
   #     when_to_save: "When a non-obvious solution works"
   #     body_structure: "Pattern, Context, Example"
+
+  # --- Index ---
+  # Max lines for MEMORY.md before triggering a prune warning
+  max_index_lines: 200
 -->
 
 ## Memory System
 
 You have a persistent, file-based memory system at the project-scoped `.claude/memory/` directory. Build this up over time so future conversations have a complete picture of the user, their preferences, and the context behind their work.
 
-### Capture Mode: Autonomous
+### Capture Mode
 
-**You MUST save memories proactively.** Do not ask permission. Do not announce saves. Just write them silently.
+Read `capture_mode` from config above.
+
+**If `autonomous` (default):** Save memories proactively. Do not ask permission. Do not announce saves. Just write them silently.
+
+**If `confirm`:** When you detect a trigger signal, propose the memory to the user before saving. Format: "I'd save this as a [type] memory: [one-line description]. OK?" Only save after approval.
 
 **Trigger signals — save when you detect any of these:**
 
@@ -45,9 +70,10 @@ You have a persistent, file-based memory system at the project-scoped `.claude/m
 | Bug resolved with non-obvious fix | project | root cause wasn't what it seemed, workaround needed |
 | User says "remember" or "don't forget" | any | explicit save request — do it immediately |
 
-**How to save — background, never inline:**
+**How to save — read `save_mode` from config:**
 
-1. **During your response** — mentally note trigger signals as you encounter them. Do NOT stop to write memory files mid-response. Stay focused on the user's task.
+**If `background` (default):**
+1. **During your response** — mentally note trigger signals. Do NOT stop to write memory files mid-response. Stay focused on the user's task.
 2. **At the end of your response** — if you detected any trigger signals, dispatch a single background Agent (`run_in_background: true`) with a clear list of what to save:
 
 ```
@@ -59,11 +85,15 @@ Read MEMORY.md first to avoid duplicates. Write each memory as its own file with
 
 3. **If no signals detected** — do nothing. Not every response needs a save.
 
-**Exception:** When the user explicitly says "remember this" or "don't forget" — save immediately inline, not in background. Explicit requests get immediate action.
+**If `inline`:**
+1. Save memories directly as you detect trigger signals using Write/Edit tools.
+2. This is immediate but may briefly interrupt the user's task flow.
 
-### Periodic Sweep (Hook-Triggered, Background)
+**Exception (both modes):** When the user explicitly says "remember this" or "don't forget" — save immediately inline regardless of `save_mode`. Explicit requests get immediate action.
 
-A `UserPromptSubmit` hook fires every 10 messages and injects a `[CLAIM MEMORY SWEEP]` reminder. When you see it:
+### Periodic Sweep (Hook-Triggered)
+
+A `UserPromptSubmit` hook fires every `sweep_interval` messages (default: 10, set to 0 to disable) and injects a `[CLAIM MEMORY SWEEP]` reminder. When you see it:
 
 1. **Complete the user's request first** — never interrupt their task
 2. **Dispatch a background Agent** (`run_in_background: true`) to handle the sweep
@@ -132,6 +162,6 @@ Memories are point-in-time. Before acting on one:
 ### Index Discipline
 
 - Organize `MEMORY.md` by topic, not chronologically
-- Keep under 200 lines — always loaded into context
+- Keep under `max_index_lines` (default: 200) — always loaded into context
 - Update or remove wrong/outdated memories
 - Check for existing memories before creating duplicates
