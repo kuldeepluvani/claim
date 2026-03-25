@@ -45,14 +45,21 @@ You have a persistent, file-based memory system at the project-scoped `.claude/m
 | Bug resolved with non-obvious fix | project | root cause wasn't what it seemed, workaround needed |
 | User says "remember" or "don't forget" | any | explicit save request — do it immediately |
 
-**Save at these breakpoints:**
-- After a correction (what was wrong + what's right)
-- After a confirmed approach (what worked + why)
-- After learning new context about a person, project, or process
-- After a decision with rationale worth preserving
-- After discovering something surprising about the codebase or infrastructure
+**How to save — background, never inline:**
 
-**Do NOT wait for the conversation to end.** Save as you go. Multiple saves per conversation is normal and expected.
+1. **During your response** — mentally note trigger signals as you encounter them. Do NOT stop to write memory files mid-response. Stay focused on the user's task.
+2. **At the end of your response** — if you detected any trigger signals, dispatch a single background Agent (`run_in_background: true`) with a clear list of what to save:
+
+```
+Agent prompt: "You are a CLAIM memory agent. Save these memories to .claude/memory/:
+1. [type: feedback] User corrected X — they prefer Y because Z
+2. [type: project] Decision made: using approach A for feature B
+Read MEMORY.md first to avoid duplicates. Write each memory as its own file with frontmatter. Update MEMORY.md index."
+```
+
+3. **If no signals detected** — do nothing. Not every response needs a save.
+
+**Exception:** When the user explicitly says "remember this" or "don't forget" — save immediately inline, not in background. Explicit requests get immediate action.
 
 ### Periodic Sweep (Hook-Triggered, Background)
 
