@@ -44,6 +44,7 @@ This creates vault folders, initializes the registry, and sets up the memory ind
 | `memory-manager` | agent | Bulk ops — prune, consolidate, audit, migrate |
 | `memory-prune` | skill | Systematic memory cleanup |
 | `vault-sync` | skill | Reconcile registry with actual vault contents |
+| `claim-sweep` | hook | Every 10 prompts, triggers memory sweep |
 
 ## Configuration
 
@@ -71,6 +72,24 @@ custom_types:
     when_to_save: "When a non-obvious solution works"
     body_structure: "Pattern, Context, Example"
 ```
+
+## How It Works
+
+```
+User sends message
+       ↓
+[claim-sweep hook] — increments counter in ~/.claim/.sweep-state
+       ↓
+Every 10th message → injects [CLAIM MEMORY SWEEP] into context
+       ↓
+Claude sees reminder → follows claim-memory rules → saves memories
+       ↓
+Real-time capture handles the other 9 messages via trigger signals
+```
+
+Two layers:
+1. **Real-time** — Claude detects corrections, preferences, decisions and saves immediately
+2. **Periodic sweep** — hook mechanically fires every 10 prompts as a safety net
 
 ## Requirements
 

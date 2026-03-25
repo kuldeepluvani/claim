@@ -13,5 +13,6 @@
   "agents": ["./agents/memory-manager.md"],
   "commands": ["./commands/claim-init.md", "./commands/claim-status.md", "./commands/claim-prune.md"],
   "rules": ["./rules/claim-memory.md", "./rules/claim-vault.md"],
-  "skills": ["./skills/memory-prune", "./skills/vault-sync"]
+  "skills": ["./skills/memory-prune", "./skills/vault-sync"],
+  "hooks": "./hooks/hooks.json"
 }
