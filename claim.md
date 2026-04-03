@@ -98,10 +98,6 @@ Ask ONE question at a time. Wait for each answer before proceeding.
    ## User
 
    ## Feedback
-
-   ## Project
-
-   ## Reference
    ```
 
 5. **Generate `~/.claude/hooks/claim-sweep.sh`** — write the sweep hook script (see Fixed Sweep section). Make it executable with `chmod +x`.
@@ -110,26 +106,39 @@ Ask ONE question at a time. Wait for each answer before proceeding.
 
 ---
 
+## Memory vs Vault — The Split
+
+**Memory is thin. Vault is deep.**
+
+Memory (`~/.claude/memory/`) is a lightweight behavioral roster — loaded every session, shapes how you act. Only two types belong here:
+
+| Type | What it stores | Example |
+|:--|:--|:--|
+| `user` | Who the user is — role, expertise, working style | "Senior engineer, prefers terse responses, 10 years Go" |
+| `feedback` | How user wants you to work — corrections AND confirmations | "Never force-push to main", "Single bundled PR was the right call" |
+
+**Everything else goes to the vault.** Project context, decisions, references, API quirks, deploy patterns, service interactions — this is knowledge, not preferences. Route it through the Vault System to the appropriate vault and folder.
+
 ## Memory System
+
+Memory is the preference/behavior layer. Keep it small. Two types only.
 
 **Capture Mode** — read `capture_mode` from config above:
 - `autonomous` (default): Save silently. No announcement, no asking, no confirmation. Just write.
-- `confirm`: Propose the memory — "I'd save this as a [type] memory: [one-line]. OK?" Only save after explicit approval.
-- **Exception for both modes:** when user says "remember this" or "don't forget" — save immediately inline, always, regardless of mode.
+- `confirm`: Propose the save — "I'd save this as a [type]: [one-line]. OK?" Only save after explicit approval.
+- **Exception for both modes:** when user says "remember this" or "don't forget" — save immediately, always.
 
 **Save Mode** — read `save_mode` from config above:
-- `background` (default): During your response, mentally note trigger signals. Do NOT stop mid-response to save. At the END, dispatch a single background Agent (`run_in_background: true`) with a clear list of what to save. Format the agent prompt: *"You are a CLAIM memory agent. Save these memories to ~/.claude/memory/: 1. [type: feedback] ... 2. [type: project] ... Read MEMORY.md first to avoid duplicates."*
+- `background` (default): During your response, mentally note trigger signals. Do NOT stop mid-response. At the END, dispatch a single background Agent (`run_in_background: true`) with a clear list of what to save — both memory files and vault notes. Format: *"You are a CLAIM agent. Save to ~/.claude/memory/: 1. [feedback] ... Save to vault: 1. [project context → Zefr vault, Plans/] ... Read MEMORY.md and registries first to avoid duplicates."*
 - `inline`: Save directly using Write/Edit tools as triggers fire. Immediate but interruptive.
-- If no triggers detected in a response, do nothing. Not every response needs a save.
+- If no triggers detected in a response, do nothing.
 
-**Memory Types:**
+**Memory Types (2 only):**
 
 | Type | What it stores | When to save | Body structure |
 |:--|:--|:--|:--|
 | `user` | Role, goals, preferences, expertise | When you learn about the user | Free-form |
-| `feedback` | How user wants you to work — corrections AND confirmations (save what worked too, not just failures) | When user corrects or confirms your approach | Rule first, then `**Why:**` line, then `**How to apply:**` line |
-| `project` | Ongoing work, decisions, bugs, context not derivable from code/git | When you learn who/what/why/when | Fact first, then `**Why:**` and `**How to apply:**` lines. Convert relative dates ("next Thursday") to absolute dates. |
-| `reference` | Pointers to external systems, tools, infra | When external resource/tool discovered | Location + purpose |
+| `feedback` | How user wants you to work — corrections AND confirmations | When user corrects or confirms your approach | Rule first, then `**Why:**` line, then `**How to apply:**` line |
 
 **Memory File Format** — two steps, BOTH required:
 
@@ -138,73 +147,82 @@ Ask ONE question at a time. Wait for each answer before proceeding.
 ---
 name: {{memory name}}
 description: {{one-line — specific enough to judge relevance in future sessions}}
-type: {{user | feedback | project | reference}}
+type: {{user | feedback}}
 ---
 
 {{content}}
 ```
 
-**Step 2:** Add a pointer in `MEMORY.md`. The index contains ONLY links + brief descriptions (one line, under 150 chars) — never content directly. Organize by topic, not chronologically.
+**Step 2:** Add a pointer in `MEMORY.md`. One line, under 150 chars — link + hook. Organize by topic, not chronologically.
 
-**What NOT to Save:**
-- Code patterns, architecture, file paths — derivable from reading code
-- Git history — `git log` / `git blame` are authoritative
-- Debug solutions — fix is in the code, commit message has context
+**What does NOT go in memory:**
+- Project context, decisions, deadlines → vault note
+- External system references, API quirks → vault note
+- Architecture decisions, deploy patterns → vault note
+- Code patterns, file paths — derivable from reading code
+- Git history — `git log` is authoritative
+- Debug solutions — fix is in the code
 - Anything already in `CLAUDE.md` or `claim.md` config
 - Ephemeral task details
 
 **Staleness:**
-Memories are point-in-time snapshots. Before acting on one:
+Memories are point-in-time. Before acting on one:
 - File path → check it exists
 - Function/flag → grep for it
 - Conflicts with current state → trust what you observe now, update the stale memory
 
 **Index Discipline:**
-- Keep `MEMORY.md` under `max_index_lines` from config (default 200) — it loads into context every session
-- Update or remove wrong/outdated memories when you encounter them
+- Keep `MEMORY.md` under `max_index_lines` from config (default 200) — loaded every session
+- Update or remove wrong/outdated memories
 - Check for existing memories before creating duplicates
 
 ---
 
 ## Capture Triggers
 
+Every trigger routes to either **memory** (behavioral) or **vault** (knowledge). The destination column tells you where.
+
 ### Core Triggers (always active)
 
-| Signal | Type | Example |
+| Signal | Destination | Example |
 |:--|:--|:--|
-| User corrects your approach | `feedback` | "no, don't do it that way" |
-| User confirms non-obvious approach | `feedback` | "yes exactly", "perfect", accepting an unusual choice |
-| User shares role/background | `user` | "I'm a data scientist", "I've been doing Go for 10 years" |
-| User states preference | `user` | "I prefer terse responses", "skip the preamble" |
-| Project context shared | `project` | "we're freezing merges Thursday", "legal flagged the auth middleware" |
-| External system reference | `reference` | "bugs tracked in Linear project X" |
-| Decision finalized | `project` | Architecture choice locked in, tool selected |
-| Explicit "remember" / "don't forget" | any | Immediate save, always — overrides both capture modes |
+| User corrects your approach | **memory** (`feedback`) | "no, don't do it that way" |
+| User confirms non-obvious approach | **memory** (`feedback`) | "yes exactly", "perfect", accepting an unusual choice |
+| User shares role/background | **memory** (`user`) | "I'm a data scientist", "I've been doing Go for 10 years" |
+| User states preference | **memory** (`user`) | "I prefer terse responses", "skip the preamble" |
+| Project context shared | **vault** (route by content) | "we're freezing merges Thursday", "legal flagged the auth middleware" |
+| External system reference | **vault** (route by content) | "bugs tracked in Linear project X" |
+| Decision finalized | **vault** (Architecture or Plans) | Architecture choice locked in, tool selected |
+| Explicit "remember" / "don't forget" | **ask** — memory or vault? | Immediate save, always — overrides both capture modes |
 
 ### Software Engineering Triggers (active by default)
 
-| Signal | Type | What to capture |
+| Signal | Destination | What to capture |
 |:--|:--|:--|
-| Root cause found after debugging | `project` | Actual cause + what it looked like initially — capture the misdirection pattern, not just the fix |
-| Architecture decision made | `project` | Choice, alternatives rejected, and WHY — "chose Kafka over SQS because ordering matters" |
-| Dependency/tooling discovery | `reference` | "this library handles X better than Y" or "avoid Z, breaks on ARM" |
-| Environment/infra quirk | `reference` | "service needs --memory 2Gi or OOMs on large payloads" |
-| API behavior learned the hard way | `reference` | "endpoint returns 200 empty body when unauth, not 401" |
-| Performance finding | `project` | "query slow because missing composite index on (tenant_id, created_at)" |
-| Deploy/release pattern | `reference` | "this repo uses bumpversion, never manual version edits" |
-| Service interaction discovered | `reference` | "service A webhooks to B, if B down retries 3x then dead-letters" |
-| Team convention learned | `feedback` | "PRs need JIRA ID prefix", "no force-push to main" |
-| Security pattern | `reference` | "mTLS required between pods", "tokens expire in 15m" |
-| Code review feedback received | `feedback` | Recurring review patterns — "team prefers composition over inheritance here" |
-| Incident learning | `project` | What broke, why, what to watch for — not the fix but the CONTEXT |
+| Root cause found after debugging | **vault** | Actual cause + what it looked like initially — capture the misdirection pattern |
+| Architecture decision made | **vault** (Architecture) | Choice, alternatives rejected, and WHY |
+| Dependency/tooling discovery | **vault** | "this library handles X better than Y" or "avoid Z, breaks on ARM" |
+| Environment/infra quirk | **vault** | "service needs --memory 2Gi or OOMs on large payloads" |
+| API behavior learned the hard way | **vault** | "endpoint returns 200 empty body when unauth, not 401" |
+| Performance finding | **vault** | "query slow because missing composite index on (tenant_id, created_at)" |
+| Deploy/release pattern | **vault** | "this repo uses bumpversion, never manual version edits" |
+| Service interaction discovered | **vault** | "service A webhooks to B, if B down retries 3x then dead-letters" |
+| Team convention learned | **memory** (`feedback`) | "PRs need JIRA ID prefix", "no force-push to main" |
+| Security pattern | **vault** | "mTLS required between pods", "tokens expire in 15m" |
+| Code review feedback received | **memory** (`feedback`) | Recurring review patterns — "team prefers composition over inheritance here" |
+| Incident learning | **vault** (Incidents) | What broke, why, what to watch for — not the fix but the CONTEXT |
 
-> These software engineering triggers can be disabled by removing this section from config. They're recommended for any developer.
+> Software engineering triggers can be disabled by removing this section. Recommended for any developer.
+
+**Routing rule:** If it's about *how the user wants you to behave* → memory. If it's *knowledge about the world* (systems, APIs, patterns, decisions) → vault. When in doubt, vault — memory should stay thin.
 
 ---
 
 ## Vault System
 
-CLAIM supports multiple Obsidian vaults. Each vault is declared in the YAML config with a name, path, purpose, semantic routes, and folder list. Memory (`~/.claude/memory/`) shapes how you behave. Vault notes store what the user knows. Never conflate the two.
+CLAIM supports multiple Obsidian vaults. Each vault is declared in the YAML config with a name, path, purpose, semantic routes, and folder list.
+
+**Memory is the router. Vault is the store.** Memory holds only behavioral preferences (user profile, feedback). ALL knowledge — project context, decisions, references, API quirks, deploy patterns, architecture, incidents — goes to the vault. Route it here using the rules below.
 
 ### Routing
 
