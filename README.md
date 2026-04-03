@@ -1,29 +1,69 @@
-# CLAIM — Claude AI Memory
+<p align="center">
+  <h1 align="center">CLAIM</h1>
+  <p align="center"><strong>Claude AI Memory</strong></p>
+  <p align="center">Single-file, self-bootstrapping, multi-vault persistent memory for Claude Code</p>
+</p>
 
-Single-file, self-bootstrapping, multi-vault persistent memory for [Claude Code](https://claude.ai/claude-code).
+<p align="center">
+  <a href="https://github.com/kuldeepluvani/claim/blob/main/LICENSE"><img src="https://img.shields.io/github/license/kuldeepluvani/claim?style=flat-square&color=blue" alt="License"></a>
+  <a href="https://github.com/kuldeepluvani/claim/releases"><img src="https://img.shields.io/github/v/release/kuldeepluvani/claim?style=flat-square&color=green&label=version" alt="Version"></a>
+  <a href="https://github.com/kuldeepluvani/claim/stargazers"><img src="https://img.shields.io/github/stars/kuldeepluvani/claim?style=flat-square&color=yellow" alt="Stars"></a>
+  <a href="https://github.com/kuldeepluvani/claim/issues"><img src="https://img.shields.io/github/issues/kuldeepluvani/claim?style=flat-square" alt="Issues"></a>
+  <a href="https://github.com/kuldeepluvani/claim/pulls"><img src="https://img.shields.io/github/issues-pr/kuldeepluvani/claim?style=flat-square" alt="PRs"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey?style=flat-square" alt="Platform">
+  <img src="https://img.shields.io/badge/claude%20code-plugin-purple?style=flat-square" alt="Claude Code Plugin">
+  <img src="https://img.shields.io/badge/obsidian-compatible-7C3AED?style=flat-square" alt="Obsidian Compatible">
+</p>
+
+<p align="center">
+  <a href="#install">Install</a> &bull;
+  <a href="#setup">Setup</a> &bull;
+  <a href="#how-it-works">How It Works</a> &bull;
+  <a href="#configuration">Configuration</a> &bull;
+  <a href="#commands">Commands</a> &bull;
+  <a href="#contributing">Contributing</a>
+</p>
+
+---
+
+## Why CLAIM?
+
+Claude Code forgets everything between sessions. CLAIM fixes that.
+
+- **One file.** No CLI tools, no npm, no Docker. Just a markdown file that teaches Claude how to remember.
+- **Self-bootstrapping.** Claude itself runs the setup. No installer needed.
+- **Multi-vault.** Route work notes to one vault, personal notes to another. Semantic matching, not manual sorting.
+- **Two-tier memory.** Thin behavioral layer (preferences, corrections) + deep knowledge store (Obsidian vaults).
+- **Software engineer-first.** Specialized triggers for debug breakthroughs, arch decisions, API quirks, deploy patterns.
+
+---
 
 ## Install
+
+### Plugin (recommended)
 
 ```bash
 # Add the marketplace (one-time)
 claude plugin marketplace add kuldeepluvani/claim
 
-# Install the plugin
+# Install
 claude plugin install claim@claim-marketplace
 ```
 
-To uninstall:
 ```bash
+# Uninstall
 claude plugin uninstall claim@claim-marketplace
 ```
 
-### Manual install (alternative)
+### Manual (alternative)
 
 ```bash
 mkdir -p ~/.claude/rules ~/.claude/commands && \
 curl -sL https://raw.githubusercontent.com/kuldeepluvani/claim/main/claim.md -o ~/.claude/rules/claim.md && \
 curl -sL https://raw.githubusercontent.com/kuldeepluvani/claim/main/commands/claim-init.md -o ~/.claude/commands/claim-init.md
 ```
+
+---
 
 ## Setup
 
@@ -41,51 +81,87 @@ Claude walks you through interactive setup — one question at a time:
 4. Capture mode (autonomous/confirm), save mode (background/inline)
 5. Sweep preferences (prompt interval, time interval)
 
-Claude then creates vault folders, registries, memory index, and the sweep hook. Done.
+Claude creates vault folders, registries, memory index, and the sweep hook.
 
-```
-/claim-init → interactive setup → vaults configured → ready
-```
+Re-run `/claim-init` anytime to add vaults or change settings. Idempotent — never overwrites existing content.
 
-Re-run `/claim-init` anytime to add vaults or change settings. It never overwrites existing content.
-
-## What You Get
-
-| Component | What it does |
-|:---|:---|
-| **Autonomous capture** | Detects corrections, preferences, decisions — saves silently |
-| **SE triggers** | Debug breakthroughs, arch decisions, API quirks, deploy patterns, team conventions |
-| **Multi-vault routing** | Content routed to the right vault by semantic keyword matching |
-| **Registry discipline** | Every vault has `_registry.md` — one Read = full map |
-| **Fixed sweep** | Every 10 prompts OR 30 min — safety net for missed captures |
-| **`/claim-init`** | Re-run setup, add vaults, update config |
-| **`/claim-status`** | Health check — memories, vaults, sweep state |
-| **`/claim-prune`** | Clean stale memories, fix registry drift |
+---
 
 ## How It Works
 
-**Two-tier memory:**
+```
+                    CLAIM
+                      |
+          +-----------+-----------+
+          |                       |
+      Memory                   Vault
+   (~/.claude/memory/)      (Obsidian vaults)
+          |                       |
+    Behavioral layer        Knowledge store
+    - user profile          - services, tickets
+    - feedback/prefs        - architecture decisions
+                            - incidents, runbooks
+                            - project context
+                            - API quirks, patterns
+```
 
-- **Auto-memory** (`.claude/memory/`) — behavioral observations, user preferences, corrections
-- **Obsidian vaults** — structured knowledge: services, tickets, plans, architecture, incidents
+**Memory is the router. Vault is the brain.**
 
-Claude captures autonomously as you work. Software engineering triggers fire on debug breakthroughs, architecture decisions, API quirks, deployment patterns, and team conventions. The fixed sweep runs every 10 prompts or 30 minutes (whichever fires first) as a safety net for anything the triggers missed.
+| Layer | What it stores | Loaded |
+|:---|:---|:---|
+| **Memory** | User profile, feedback, corrections | Every session (thin) |
+| **Vault** | Services, tickets, plans, architecture, incidents, references | On demand via registry |
+
+### Capture Triggers
+
+CLAIM captures autonomously as you work:
+
+| Trigger | Destination | Example |
+|:---|:---|:---|
+| User corrects approach | Memory | "no, don't do it that way" |
+| User confirms approach | Memory | "yes exactly", "perfect" |
+| Root cause found | Vault | Bug cause + initial misdirection |
+| Architecture decision | Vault | Choice + alternatives + why |
+| API quirk discovered | Vault | "returns 200 empty body, not 401" |
+| Deploy pattern learned | Vault | "uses bumpversion, never manual" |
+| Team convention | Memory | "PRs need JIRA ID prefix" |
+
+### Fixed Sweep
+
+Safety net that fires on **whichever comes first**:
+- Every N prompts (default: 10)
+- Every M minutes (default: 30)
+
+Catches what real-time triggers missed during flow state.
+
+---
+
+## Commands
+
+| Command | Description |
+|:---|:---|
+| `/claim-init` | Run or re-run setup. Add vaults, update config. |
+| `/claim-status` | Health check — memories, vaults, sweep state, config. |
+| `/claim-prune` | Clean stale memories, consolidate duplicates, audit registries. |
+
+---
 
 ## Configuration
 
-All config lives inside `claim.md` itself as YAML in an HTML comment. No extra files.
+All config lives inside `claim.md` as YAML in an HTML comment. No extra files.
 
-| Setting | Options | Default |
-|:---|:---|:---|
-| `capture_mode` | `autonomous`, `confirm` | `autonomous` |
-| `save_mode` | `background`, `inline` | `background` |
-| `sweep.prompt_interval` | `0-N` | `10` |
-| `sweep.time_interval_min` | `0-N` | `30` |
-| `max_index_lines` | `N` | `200` |
+| Setting | Options | Default | Description |
+|:---|:---|:---|:---|
+| `capture_mode` | `autonomous`, `confirm` | `autonomous` | Save silently or ask first |
+| `save_mode` | `background`, `inline` | `background` | Batch at end or save immediately |
+| `sweep.enabled` | `true`, `false` | `true` | Enable/disable fixed sweep |
+| `sweep.prompt_interval` | `0-N` | `10` | Prompts between sweeps (0 = disable) |
+| `sweep.time_interval_min` | `0-N` | `30` | Minutes between sweeps (0 = disable) |
+| `max_index_lines` | `N` | `200` | MEMORY.md prune warning threshold |
 
 ### Sample Config
 
-After `/claim-init`, the config block inside `claim.md` looks like this:
+After `/claim-init`, the config block inside `claim.md`:
 
 ```yaml
 claim-config:
@@ -105,31 +181,71 @@ claim-config:
 
   default_vault: Personal
 
-  # Capture behavior
   capture_mode: autonomous    # autonomous = saves silently | confirm = asks first
   save_mode: background       # background = batched at end | inline = immediate
 
-  # Fixed sweep — safety net for missed captures
   sweep:
     enabled: true
     prompt_interval: 10       # every N prompts (0 = disable)
     time_interval_min: 30     # OR every M minutes (0 = disable)
 
-  # Memory index size
   max_index_lines: 200
 ```
 
-Routes use semantic keyword matching — content about services, repos, or tickets goes to Work; project and tool notes go to Personal. No manual sorting.
+Routes use **semantic keyword matching** — content about services, repos, or tickets goes to Work; project and tool notes go to Personal. No manual sorting.
+
+---
 
 ## Requirements
 
-- [Claude Code](https://claude.ai/claude-code)
-- A folder for your vault (Obsidian recommended, but `.obsidian/` not required)
+| Requirement | Required | Notes |
+|:---|:---|:---|
+| [Claude Code](https://claude.ai/claude-code) | Yes | CLI v2.0+ |
+| [Obsidian](https://obsidian.md) | Recommended | Any folder works, `.obsidian/` not required |
+| macOS or Linux | Yes | POSIX-compatible sweep hook |
+
+---
+
+## Project Structure
+
+```
+claim/
+  .claude-plugin/       # Claude Code plugin manifests
+  .cursor-plugin/       # Cursor plugin manifests
+  commands/
+    claim-init.md       # /claim-init command
+    claim-status.md     # /claim-status command
+    claim-prune.md      # /claim-prune command
+  claim.md              # THE file — rules, config, bootstrap, memory, vault, sweep
+  README.md
+  LICENSE
+```
+
+---
+
+## Contributing
+
+Contributions welcome! Please:
+
+1. Fork the repo
+2. Create a feature branch (`git checkout -b feat/my-feature`)
+3. Commit with [conventional commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`)
+4. Open a PR against `main`
+
+### Ideas for contribution
+
+- Additional capture triggers for other roles (data science, DevOps, PM)
+- Vault templates for different workflows
+- Integration with other note-taking tools beyond Obsidian
+
+---
 
 ## License
 
-MIT
+[MIT](LICENSE)
 
-## Author
+---
 
-[Kuldeep Luvani](https://github.com/kuldeepluvani)
+<p align="center">
+  Built by <a href="https://github.com/kuldeepluvani">Kuldeep Luvani</a>
+</p>
