@@ -5,12 +5,25 @@ Single-file, self-bootstrapping, multi-vault persistent memory for [Claude Code]
 ## Install
 
 ```bash
+# Add the marketplace (one-time)
+claude plugin marketplace add kuldeepluvani/claim
+
+# Install the plugin
+claude plugin install claim@claim-marketplace
+```
+
+To uninstall:
+```bash
+claude plugin uninstall claim@claim-marketplace
+```
+
+### Manual install (alternative)
+
+```bash
 mkdir -p ~/.claude/rules ~/.claude/commands && \
 curl -sL https://raw.githubusercontent.com/kuldeepluvani/claim/main/claim.md -o ~/.claude/rules/claim.md && \
 curl -sL https://raw.githubusercontent.com/kuldeepluvani/claim/main/commands/claim-init.md -o ~/.claude/commands/claim-init.md
 ```
-
-Two files. No dependencies.
 
 ## Setup
 
