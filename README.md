@@ -5,27 +5,36 @@ Single-file, self-bootstrapping, multi-vault persistent memory for [Claude Code]
 ## Install
 
 ```bash
-curl -sL https://raw.githubusercontent.com/kuldeepluvani/claim/main/claim.md \
-  -o ~/.claude/rules/claim.md
+mkdir -p ~/.claude/rules ~/.claude/commands && \
+curl -sL https://raw.githubusercontent.com/kuldeepluvani/claim/main/claim.md -o ~/.claude/rules/claim.md && \
+curl -sL https://raw.githubusercontent.com/kuldeepluvani/claim/main/commands/claim-init.md -o ~/.claude/commands/claim-init.md
 ```
 
-That's it. One file. No dependencies.
+Two files. No dependencies.
 
-## First Run
+## Setup
 
-Start any Claude Code session. Claude detects the empty config and walks you through interactive setup:
+After installing, open any Claude Code session and run:
 
 ```
-curl claim.md → ~/.claude/rules/
-     ↓
-Claude reads it → empty config detected → interactive setup
-     ↓
-Vaults configured → folders created → registries initialized → sweep hook installed
-     ↓
-Every session: autonomous capture on triggers + sweep safety net
+/claim-init
 ```
 
-You pick your vault paths, folder structure, routing keywords, and capture preferences. Claude creates everything.
+Claude walks you through interactive setup — one question at a time:
+
+1. How many vaults?
+2. Vault name, path, purpose, folders, routing keywords (per vault)
+3. Default vault for unmatched content
+4. Capture mode (autonomous/confirm), save mode (background/inline)
+5. Sweep preferences (prompt interval, time interval)
+
+Claude then creates vault folders, registries, memory index, and the sweep hook. Done.
+
+```
+/claim-init → interactive setup → vaults configured → ready
+```
+
+Re-run `/claim-init` anytime to add vaults or change settings. It never overwrites existing content.
 
 ## What You Get
 

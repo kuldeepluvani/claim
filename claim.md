@@ -32,9 +32,22 @@ Memory shapes how you behave. Vaults store what the user knows. This file config
 
 If `vaults` in the config above is empty (`[]`), run the setup flow before doing anything else. Do NOT skip this — the system does not work without configured vaults.
 
+### Preflight Checks
+
+Before starting the interactive setup, run these checks silently and report results:
+
+1. **Claude Code version** — run `claude --version` to confirm CLI is available
+2. **Obsidian CLI** — run `which obsidian` or check if Obsidian is installed (`/Applications/Obsidian.app` on macOS, `which obsidian` on Linux). If not found, warn: "Obsidian not detected. CLAIM works with any folder, but Obsidian is recommended for full vault features (wikilinks, graph view, search). Continue anyway?"
+3. **Existing config** — check if `~/.claude/memory/MEMORY.md` already exists (migration from v1 or prior setup). If so, note it will be preserved.
+4. **Write permissions** — confirm `~/.claude/rules/claim.md` is writable (needed to update config in-place)
+
+If all checks pass, proceed. If Obsidian is missing, let the user decide whether to continue or install it first.
+
+### Interactive Setup
+
 Ask ONE question at a time. Wait for each answer before proceeding.
 
-**Step 1:** "How many Obsidian vaults do you use?"
+**Step 1:** "How many vaults do you use?" (Obsidian vaults or any folders for structured notes)
 
 **Step 2** (repeat for each vault):
 1. "Vault name?" — short label (e.g. "Zefr", "Personal")
