@@ -9,7 +9,7 @@
     {
       "name": "claim",
       "description": "Claude AI Memory — autonomous capture, multi-vault Obsidian integration, self-bootstrapping",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "source": "./",
       "author": {
         "name": "Kuldeep Luvani",
