@@ -1,6 +1,0 @@
-services:
-  claim-test:
-    build: .
-    container_name: claim-fresh-test
-    stdin_open: true
-    tty: true
