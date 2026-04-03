@@ -83,23 +83,40 @@ All config lives inside `claim.md` itself as YAML in an HTML comment. No extra f
 | `sweep.time_interval_min` | `0-N` | `30` |
 | `max_index_lines` | `N` | `200` |
 
-### Multi-Vault Example
+### Sample Config
+
+After `/claim-init`, the config block inside `claim.md` looks like this:
 
 ```yaml
-vaults:
-  - name: Work
-    path: ~/Documents/Obsidian/Work
-    purpose: "Engineering — services, tickets, incidents"
-    routes: [service, repo, ticket, jira, incident]
-    folders: [Services, Tickets, Plans, Architecture, Daily]
+claim-config:
 
-  - name: Personal
-    path: ~/Documents/Obsidian/Personal
-    purpose: "Personal projects, hobbies, life"
-    routes: [project, tool, app]
-    folders: [Projects, Daily, Plans]
+  vaults:
+    - name: Work
+      path: ~/Documents/Obsidian/Work
+      purpose: "Engineering — services, tickets, incidents"
+      routes: [service, repo, ticket, jira, incident, architecture, runbook, standup]
+      folders: [Services, Tickets, Plans, Architecture, Incidents, Runbooks, Daily]
 
-default_vault: Personal
+    - name: Personal
+      path: ~/Documents/Obsidian/Personal
+      purpose: "Personal projects, hobbies, life"
+      routes: [project, tool, app, daily, journal]
+      folders: [Projects, Daily, Plans]
+
+  default_vault: Personal
+
+  # Capture behavior
+  capture_mode: autonomous    # autonomous = saves silently | confirm = asks first
+  save_mode: background       # background = batched at end | inline = immediate
+
+  # Fixed sweep — safety net for missed captures
+  sweep:
+    enabled: true
+    prompt_interval: 10       # every N prompts (0 = disable)
+    time_interval_min: 30     # OR every M minutes (0 = disable)
+
+  # Memory index size
+  max_index_lines: 200
 ```
 
 Routes use semantic keyword matching — content about services, repos, or tickets goes to Work; project and tool notes go to Personal. No manual sorting.
