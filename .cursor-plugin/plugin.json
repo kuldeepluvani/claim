@@ -19,5 +19,5 @@
     "multi-vault"
   ],
   "rules": ["./claim.md"],
-  "commands": ["./commands/claim-init.md"]
+  "commands": ["./commands/claim-init.md", "./commands/claim-status.md", "./commands/claim-prune.md"]
 }
