@@ -1,0 +1,20 @@
+{
+  "name": "claim-marketplace",
+  "description": "CLAIM — Claude AI Memory plugin marketplace",
+  "owner": {
+    "name": "Kuldeep Luvani",
+    "email": "kuldeepluvani@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "claim",
+      "description": "Claude AI Memory — autonomous capture, multi-vault Obsidian integration, self-bootstrapping",
+      "version": "2.0.0",
+      "source": "./",
+      "author": {
+        "name": "Kuldeep Luvani",
+        "email": "kuldeepluvani@gmail.com"
+      }
+    }
+  ]
+}
