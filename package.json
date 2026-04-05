@@ -3,12 +3,15 @@
   "version": "3.0.0-alpha.1",
   "description": "Developer Knowledge OS — persistent memory for AI coding agents",
   "type": "module",
+  "files": ["dist", "src/ui", "README.md", "LICENSE"],
   "bin": {
-    "claim": "./dist/cli/index.js"
+    "claim": "./dist/index.js"
   },
   "scripts": {
     "dev": "bun run --watch src/cli/index.ts",
-    "build": "bun build src/cli/index.ts --outdir dist/cli --target bun",
+    "build": "bun build src/cli/index.ts --outdir dist --target bun --minify",
+    "build:binary": "bun build src/cli/index.ts --compile --outfile dist/claim",
+    "prepublishOnly": "bun run build",
     "test": "bun test",
     "typecheck": "tsc --noEmit"
   },

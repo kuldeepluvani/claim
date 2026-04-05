@@ -72,11 +72,18 @@ export function createServer(options: ServerOptions): { stop: () => void; port: 
           });
         }
 
-        // Static file serving for UI
+        // Static file serving for UI — try multiple paths
         const uiPath = path === "/" ? "/index.html" : path;
-        const file = Bun.file(join(import.meta.dir, "../ui", uiPath));
-        if (await file.exists()) {
-          return new Response(file);
+        const possiblePaths = [
+          join(import.meta.dir, "../ui", uiPath),          // dev mode (from src/worker/)
+          join(import.meta.dir, "../../src/ui", uiPath),    // built mode (from dist/)
+          join(process.cwd(), "src/ui", uiPath),            // fallback: cwd
+        ];
+        for (const candidate of possiblePaths) {
+          const file = Bun.file(candidate);
+          if (await file.exists()) {
+            return new Response(file);
+          }
         }
 
         return Response.json({ error: "not found" }, { status: 404 });
