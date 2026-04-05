@@ -111,6 +111,23 @@ describe("Worker API", () => {
     expect(body.ended).toBe(true);
   });
 
+  it("session-start returns context with repo info", async () => {
+    const res = await fetch(`${BASE}/hooks/session-start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: "test-sess-ctx",
+        repo: "test-repo",
+        branch: "main",
+      }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.session_id).toBe("test-sess-ctx");
+    expect(body.context).not.toBeNull();
+    expect(body.context).toContain("test-repo");
+  });
+
   it("returns 404 for unknown routes", async () => {
     const res = await fetch(`${BASE}/unknown`);
     expect(res.status).toBe(404);

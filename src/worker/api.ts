@@ -1,6 +1,7 @@
 import { ClaimDatabase } from "../storage/sqlite";
 import { Observer } from "../capture/observer";
 import { DEFAULT_CONFIG } from "../shared/config";
+import { generateContext } from "../context/generator";
 
 const startedAt = Date.now();
 
@@ -56,7 +57,12 @@ export function createRoutes(db: ClaimDatabase) {
         branch: (body.branch as string) || null,
         started_at: new Date().toISOString(),
       });
-      return Response.json({ session_id: sessionId, context: null });
+      const contextResult = generateContext(
+        db,
+        (body.repo as string) || null,
+        (body.branch as string) || null
+      );
+      return Response.json({ session_id: sessionId, context: contextResult.text });
     },
 
     hookSessionEnd(body: Record<string, unknown>): Response {
