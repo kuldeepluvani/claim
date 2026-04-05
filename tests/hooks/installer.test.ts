@@ -12,31 +12,37 @@ describe("Hook Installer", () => {
   beforeEach(cleanup);
   afterEach(cleanup);
 
-  it("creates settings file with hooks when none exists", () => {
+  it("creates settings file with correct matcher+hooks format", () => {
     installHooks(TEST_SETTINGS);
     expect(existsSync(TEST_SETTINGS)).toBe(true);
 
     const settings = JSON.parse(readFileSync(TEST_SETTINGS, "utf-8"));
     expect(settings.hooks).toBeDefined();
-    expect(Object.keys(settings.hooks).length).toBeGreaterThanOrEqual(1);
 
-    // Check that all 6 event types have hooks
-    const hookKeys = Object.keys(settings.hooks);
-    expect(hookKeys).toContain("SessionStart");
-    expect(hookKeys).toContain("UserPromptSubmit");
-    expect(hookKeys).toContain("PreToolUse");
-    expect(hookKeys).toContain("PostToolUse");
-    expect(hookKeys).toContain("Stop");
-    expect(hookKeys).toContain("SessionEnd");
+    // Check all 6 events exist
+    expect(Object.keys(settings.hooks)).toContain("SessionStart");
+    expect(Object.keys(settings.hooks)).toContain("PostToolUse");
+    expect(Object.keys(settings.hooks)).toContain("SessionEnd");
+
+    // Verify matcher+hooks format (Claude Code required format)
+    const postToolUse = settings.hooks.PostToolUse[0];
+    expect(postToolUse.matcher).toBe("Edit|Write|Bash");
+    expect(postToolUse.hooks).toBeArray();
+    expect(postToolUse.hooks[0].type).toBe("command");
+    expect(postToolUse.hooks[0].command).toBe("claim hook post-tool-use");
+
+    // SessionStart uses empty matcher (match all)
+    const sessionStart = settings.hooks.SessionStart[0];
+    expect(sessionStart.matcher).toBe("");
+    expect(sessionStart.hooks[0].command).toBe("claim hook session-start");
   });
 
   it("preserves existing settings while adding hooks", () => {
-    // Write existing settings with some custom content
     const existing = {
       permissions: { allow: ["Read", "Write"] },
       hooks: {
         PreToolUse: [
-          { type: "command", command: "other-tool pre-hook" },
+          { matcher: "Bash", hooks: [{ type: "command", command: "other-tool pre-hook" }] },
         ],
       },
     };
@@ -48,12 +54,16 @@ describe("Hook Installer", () => {
     // Existing permissions preserved
     expect(settings.permissions).toEqual({ allow: ["Read", "Write"] });
     // Other hooks preserved
-    const preToolHooks = settings.hooks.PreToolUse;
-    const otherHook = preToolHooks.find((h: any) => h.command === "other-tool pre-hook");
-    expect(otherHook).toBeDefined();
+    const preToolMatchers = settings.hooks.PreToolUse;
+    const otherMatcher = preToolMatchers.find((m: any) =>
+      m.hooks?.some((h: any) => h.command === "other-tool pre-hook")
+    );
+    expect(otherMatcher).toBeDefined();
     // CLAIM hooks added
-    const claimHook = preToolHooks.find((h: any) => h.command?.startsWith("claim hook"));
-    expect(claimHook).toBeDefined();
+    const claimMatcher = preToolMatchers.find((m: any) =>
+      m.hooks?.some((h: any) => h.command?.startsWith("claim hook"))
+    );
+    expect(claimMatcher).toBeDefined();
   });
 
   it("detects installed hooks", () => {
@@ -70,12 +80,12 @@ describe("Hook Installer", () => {
     installHooks(TEST_SETTINGS);
 
     const settings = JSON.parse(readFileSync(TEST_SETTINGS, "utf-8"));
-    // Each event type should have exactly 1 CLAIM hook
+    // Each event should have exactly 1 CLAIM matcher entry
     for (const event of Object.keys(settings.hooks)) {
-      const claimHooks = settings.hooks[event].filter(
-        (h: any) => h.command?.startsWith("claim hook")
+      const claimMatchers = settings.hooks[event].filter(
+        (m: any) => m.hooks?.some((h: any) => h.command?.startsWith("claim hook"))
       );
-      expect(claimHooks.length).toBe(1);
+      expect(claimMatchers.length).toBe(1);
     }
   });
 
@@ -83,7 +93,7 @@ describe("Hook Installer", () => {
     const existing = {
       hooks: {
         PreToolUse: [
-          { type: "command", command: "other-tool pre-hook" },
+          { matcher: "Bash", hooks: [{ type: "command", command: "other-tool pre-hook" }] },
         ],
       },
     };
@@ -93,8 +103,8 @@ describe("Hook Installer", () => {
     uninstallHooks(TEST_SETTINGS);
 
     const settings = JSON.parse(readFileSync(TEST_SETTINGS, "utf-8"));
-    const preToolHooks = settings.hooks.PreToolUse;
-    expect(preToolHooks.length).toBe(1);
-    expect(preToolHooks[0].command).toBe("other-tool pre-hook");
+    const preToolMatchers = settings.hooks.PreToolUse;
+    expect(preToolMatchers.length).toBe(1);
+    expect(preToolMatchers[0].hooks[0].command).toBe("other-tool pre-hook");
   });
 });

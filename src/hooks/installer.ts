@@ -1,28 +1,50 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { dirname } from "path";
 
-interface Hook {
+/**
+ * Claude Code hook format (as of 2026):
+ * {
+ *   "hooks": {
+ *     "PostToolUse": [
+ *       {
+ *         "matcher": "Edit|Write|Bash",
+ *         "hooks": [{ "type": "command", "command": "claim hook post-tool-use" }]
+ *       }
+ *     ]
+ *   }
+ * }
+ *
+ * Each event has an array of matchers. Each matcher has:
+ *   - matcher: string (tool name, pipe-separated list, or "" for match-all)
+ *   - hooks: array of { type: "command", command: string }
+ */
+
+interface HookCommand {
   type: string;
   command: string;
-  toolNames?: string[];
+}
+
+interface HookMatcher {
+  matcher: string;
+  hooks: HookCommand[];
 }
 
 interface Settings {
-  hooks?: Record<string, Hook[]>;
+  hooks?: Record<string, HookMatcher[]>;
   [key: string]: unknown;
 }
 
-const HOOK_EVENTS: Array<{ event: string; command: string; toolNames?: string[] }> = [
-  { event: "SessionStart", command: "claim hook session-start" },
-  { event: "UserPromptSubmit", command: "claim hook user-prompt" },
-  { event: "PreToolUse", command: "claim hook pre-tool-use", toolNames: ["Edit", "Write", "Bash"] },
-  { event: "PostToolUse", command: "claim hook post-tool-use", toolNames: ["Edit", "Write", "Bash"] },
-  { event: "Stop", command: "claim hook stop" },
-  { event: "SessionEnd", command: "claim hook session-end" },
+const HOOK_EVENTS: Array<{ event: string; command: string; matcher: string }> = [
+  { event: "SessionStart", command: "claim hook session-start", matcher: "" },
+  { event: "UserPromptSubmit", command: "claim hook user-prompt", matcher: "" },
+  { event: "PreToolUse", command: "claim hook pre-tool-use", matcher: "Edit|Write|Bash" },
+  { event: "PostToolUse", command: "claim hook post-tool-use", matcher: "Edit|Write|Bash" },
+  { event: "Stop", command: "claim hook stop", matcher: "" },
+  { event: "SessionEnd", command: "claim hook session-end", matcher: "" },
 ];
 
-function isClaimHook(hook: Hook): boolean {
-  return hook.command?.startsWith("claim hook") ?? false;
+function isClaimMatcher(entry: HookMatcher): boolean {
+  return entry.hooks?.some((h) => h.command?.startsWith("claim hook")) ?? false;
 }
 
 function readSettings(settingsPath: string): Settings {
@@ -43,21 +65,21 @@ export function installHooks(settingsPath: string): void {
   const settings = readSettings(settingsPath);
   if (!settings.hooks) settings.hooks = {};
 
-  // For each event, remove old CLAIM hooks then add the new one
   for (const def of HOOK_EVENTS) {
     if (!settings.hooks[def.event]) {
       settings.hooks[def.event] = [];
     }
 
-    // Remove existing CLAIM hooks for this event
-    settings.hooks[def.event] = settings.hooks[def.event].filter((h) => !isClaimHook(h));
+    // Remove existing CLAIM matchers for this event (idempotent)
+    settings.hooks[def.event] = settings.hooks[def.event].filter(
+      (entry) => !isClaimMatcher(entry)
+    );
 
-    // Add the new CLAIM hook
-    const hook: Hook = { type: "command", command: def.command };
-    if (def.toolNames) {
-      hook.toolNames = def.toolNames;
-    }
-    settings.hooks[def.event].push(hook);
+    // Add the CLAIM matcher
+    settings.hooks[def.event].push({
+      matcher: def.matcher,
+      hooks: [{ type: "command", command: def.command }],
+    });
   }
 
   writeSettings(settingsPath, settings);
@@ -68,7 +90,9 @@ export function uninstallHooks(settingsPath: string): void {
   if (!settings.hooks) return;
 
   for (const event of Object.keys(settings.hooks)) {
-    settings.hooks[event] = settings.hooks[event].filter((h) => !isClaimHook(h));
+    settings.hooks[event] = settings.hooks[event].filter(
+      (entry) => !isClaimMatcher(entry)
+    );
   }
 
   writeSettings(settingsPath, settings);
@@ -79,7 +103,7 @@ export function isHooksInstalled(settingsPath: string): boolean {
   if (!settings.hooks) return false;
 
   for (const event of Object.keys(settings.hooks)) {
-    if (settings.hooks[event].some((h) => isClaimHook(h))) return true;
+    if (settings.hooks[event].some((entry) => isClaimMatcher(entry))) return true;
   }
 
   return false;
