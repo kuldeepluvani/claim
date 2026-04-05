@@ -1,121 +1,97 @@
 <p align="center">
-  <h1 align="center">🧠 CLAIM</h1>
-  <p align="center"><strong>Developer Knowledge OS</strong></p>
-  <p align="center">Your code has git. Your knowledge deserves CLAIM.</p>
+  <h1 align="center">CLAIM</h1>
+  <p align="center"><b>Developer Knowledge OS</b></p>
+  <p align="center"><i>Your code has git. Your knowledge deserves CLAIM.</i></p>
 </p>
 
 <p align="center">
-  <a href="#install"><img src="https://img.shields.io/badge/install-npx%20claim-7C3AED?style=for-the-badge" alt="Install"></a>
-  <a href="https://github.com/kuldeepluvani/claim/blob/main/LICENSE"><img src="https://img.shields.io/github/license/kuldeepluvani/claim?style=flat-square&color=blue" alt="License"></a>
-  <img src="https://img.shields.io/badge/runtime-Bun-f9f1e1?style=flat-square&logo=bun" alt="Bun">
-  <img src="https://img.shields.io/badge/dependencies-2-brightgreen?style=flat-square" alt="Deps">
+  <a href="#quick-start"><img src="https://img.shields.io/badge/install-npx%20claim-7C3AED?style=for-the-badge" alt="Install"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
   <img src="https://img.shields.io/badge/tests-119%20passing-brightgreen?style=flat-square" alt="Tests">
+  <img src="https://img.shields.io/badge/deps-2-brightgreen?style=flat-square" alt="Dependencies">
+  <img src="https://img.shields.io/badge/runtime-Bun-f9f1e1?style=flat-square&logo=bun" alt="Bun">
+  <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
 </p>
 
 <p align="center">
-  <a href="#what-is-claim">What</a> &bull;
-  <a href="#why-claim-over-claude-mem">Why</a> &bull;
-  <a href="#install">Install</a> &bull;
-  <a href="#60-second-demo">Demo</a> &bull;
-  <a href="#features">Features</a> &bull;
+  <a href="#why-claim">Why</a> &bull;
+  <a href="#quick-start">Install</a> &bull;
+  <a href="#what-it-does">Features</a> &bull;
+  <a href="#how-it-works">Architecture</a> &bull;
   <a href="#cli-reference">CLI</a> &bull;
-  <a href="#architecture">Architecture</a> &bull;
+  <a href="#web-ui">Web UI</a> &bull;
   <a href="#mcp-integration">MCP</a> &bull;
   <a href="#contributing">Contributing</a>
 </p>
 
 ---
 
-## What is CLAIM?
+CLAIM captures what you learn while coding with AI and turns it into a searchable knowledge graph. Observations flow in automatically through lifecycle hooks, get structured into entities and relationships, and route to your Obsidian vault as markdown you own.
 
-CLAIM captures what you learn while coding with AI agents and turns it into structured, searchable knowledge. It auto-captures tool uses, extracts entities and relationships into a knowledge graph, and routes structured notes to your Obsidian vault. One command to install. Zero config needed.
+<!-- TODO: Add screenshot/GIF of web UI -->
 
 ---
 
-## Why CLAIM over claude-mem?
+## Why CLAIM?
+
+[claude-mem](https://github.com/anthropics/claude-mem) put AI memory on the map. CLAIM takes a different approach.
 
 | | claude-mem | **CLAIM** |
 |:---|:---|:---|
-| Install | `npx claude-mem install` | `npx claim` |
-| Dependencies | Node + Bun + Python + ChromaDB | **Bun only** |
-| Storage | Opaque SQLite + vector DB | **Markdown you own** + SQLite |
-| Structure | Flat observations | **Knowledge graph** |
-| Vault integration | None | **Obsidian-native** |
-| License | AGPL-3.0 | **MIT** |
-| Web UI | Observation list | **Graph + Timeline + Search** |
-| Token cost | Every session compressed | **Smart: only sweep cycles** |
+| **Dependencies** | Python + ChromaDB + 13 packages | **2 packages. Bun only.** |
+| **Storage** | Opaque SQLite + vector DB | **Markdown you own** + SQLite |
+| **Structure** | Flat observations | **Knowledge graph** (entities + relationships) |
+| **Vault** | None | **Obsidian-native** routing |
+| **Visualization** | Observation list | **D3 graph + timeline + search** |
+| **License** | AGPL-3.0 | **MIT** |
+| **Token cost** | Compresses every session | **Smart: only on sweep cycles** |
+| **Install** | `npx claude-mem install` | **`npx claim`** |
 
 ---
 
-## Install
+## Quick Start
 
 ```bash
 npx claim
 ```
 
-That's it. Hooks installed, worker started, web UI at [http://localhost:2626](http://localhost:2626).
+That's it. Here's what happens:
+
+1. **Interactive setup** asks for your vault path (optional) and preferences
+2. **Hooks install** into Claude Code automatically (6 lifecycle hooks)
+3. **Worker starts** on port 2626
+4. **Web UI** opens at [localhost:2626](http://localhost:2626)
+5. **Next time you code**, observations flow in and your knowledge graph builds itself
+
+Time to value: **60 seconds**.
 
 ---
 
-## 60-Second Demo
+## What It Does
 
-```
-1. npx claim                        # interactive setup (15 sec)
-2. Start coding with Claude Code     # observations flow in automatically
-3. Open http://localhost:2626        # watch your knowledge graph build in real-time
-4. claim search "auth bug"           # find what you worked on last week
-5. Next session starts               # Claude gets context: "Last session: fixed JWT expiry in auth-service"
-```
+**Auto-Capture** -- 6 lifecycle hooks capture tool uses, decisions, and discoveries as you work.
 
-Session start hooks inject a briefing from your knowledge base. Every session begins where the last one left off.
+**Knowledge Graph** -- Entities (services, people, tickets) and relationships extracted automatically.
 
----
+**Smart Context** -- SessionStart injects a relevant briefing so every session begins where the last left off.
 
-## Features
+**Vault Integration** -- Observations compressed and routed to Obsidian. Markdown you own, not opaque databases.
 
-**Auto-Capture** --- 6 lifecycle hooks capture tool uses, decisions, and discoveries as you work.
+**Full-Text Search** -- Search across all knowledge via CLI, web UI, or MCP.
 
-**Knowledge Graph** --- Entities (services, people, tickets) and relationships extracted automatically from observations.
+**Web UI** -- Dashboard, D3 graph visualization, timeline, and search at `localhost:2626`.
 
-**Smart Context** --- SessionStart injects a relevant briefing from your knowledge into every new session.
+**MCP Server** -- 4 tools for any IDE: `claim_search`, `claim_timeline`, `claim_get`, `claim_graph`.
 
-**Vault Integration** --- Observations compressed and routed to Obsidian vaults. Markdown you own, not opaque databases.
+**Sweep Engine** -- Compress observations, extract entities, route to vault, prune old data.
 
-**FTS Search** --- Full-text search across all knowledge via CLI or MCP.
+**Privacy-First** -- `<private>` tags, auto-redact `.env`/credentials, zero telemetry.
 
-**Web UI** --- Dashboard, D3 graph visualization, timeline, and search at `localhost:2626`.
-
-**MCP Server** --- 4 tools for any IDE: `claim_search`, `claim_timeline`, `claim_get`, `claim_graph`.
-
-**Sweep Engine** --- Compress, extract entities, route to vault, write notes, prune old observations.
-
-**Privacy-First** --- `<private>` tags, auto-detect `.env`/credentials, zero telemetry.
-
-**Export/Import** --- Portable knowledge bundles. Migrate from claude-mem or CLAIM v2.
+**Export/Import** -- Portable bundles. Migrate from claude-mem or CLAIM v2.
 
 ---
 
-## CLI Reference
-
-| Command | Description |
-|:---|:---|
-| `claim` / `claim init` | Interactive setup. Install hooks, create config, init database. |
-| `claim serve` | Start the worker server (default port 2626). |
-| `claim status` | Health check --- worker, hooks, config, observation count. |
-| `claim search <query>` | Full-text search across all observations. |
-| `claim sweep` | Run a sweep cycle: compress, extract, route, prune. |
-| `claim sweep --dry-run` | Preview what a sweep would process. |
-| `claim mcp` | Start the MCP server for IDE integration. |
-| `claim export` | Export knowledge to a portable bundle. |
-| `claim import` | Import from a bundle or migrate from v2/claude-mem. |
-| `claim doctor` | Diagnose issues with hooks, worker, database, config. |
-| `claim config` | View or update configuration. |
-| `claim uninstall` | Remove CLAIM hooks from Claude Code settings. |
-| `claim version` | Print version (`v3.0.0-alpha.1`). |
-
----
-
-## Architecture
+## How It Works
 
 ```
   Claude Code Session
@@ -143,30 +119,40 @@ Session start hooks inject a briefing from your knowledge base. Every session be
           claim_get / claim_graph
 ```
 
+Hooks fire on session start, stop, tool use, and subagent events. The worker processes observations, extracts entities and relationships into a knowledge graph, and the sweep engine periodically compresses everything into structured vault notes.
+
 ---
 
-## Configuration
+## CLI Reference
 
-CLAIM uses `~/.claim/config.toml`. Generated on `claim init`.
+| Command | Description |
+|:---|:---|
+| `claim` / `claim init` | Interactive setup. Install hooks, create config, init database. |
+| `claim serve` | Start the worker server (default port 2626). |
+| `claim status` | Health check -- worker, hooks, config, observation count. |
+| `claim search <query>` | Full-text search across all observations. |
+| `claim sweep` | Run a sweep cycle: compress, extract, route, prune. |
+| `claim sweep --dry-run` | Preview what a sweep would process. |
+| `claim doctor` | Diagnose issues with hooks, worker, database, config. |
+| `claim config` | View or update configuration. |
+| `claim export` | Export knowledge to a portable bundle. |
+| `claim import` | Import from a bundle or migrate from v2/claude-mem. |
+| `claim mcp` | Start the MCP server for IDE integration. |
+| `claim hook` | Manually trigger a hook event for testing. |
+| `claim version` | Print version. |
+| `claim uninstall` | Remove CLAIM hooks from Claude Code settings. |
 
-```toml
-[claim]
-port = 2626
+---
 
-[vault]
-path = "~/Documents/Obsidian/MyVault"
-enabled = true
+## Web UI
 
-[sweep]
-auto = true
-threshold = 50
+The web UI runs at `localhost:2626` with five views:
 
-[privacy]
-redact_env = true
-redact_credentials = true
-```
-
-Run `claim config` to view or update settings.
+- **Dashboard** -- Overview of observations, entities, and sweep status
+- **Graph** -- Interactive D3 knowledge graph. Explore entities and relationships visually.
+- **Timeline** -- Chronological view of observations across sessions
+- **Search** -- Full-text search with filters and previews
+- **Vault** -- Browse vault notes generated by the sweep engine
 
 ---
 
@@ -185,7 +171,7 @@ Add CLAIM to Claude Desktop, Cursor, or any MCP client:
 }
 ```
 
-Exposes 4 tools:
+**Available tools:**
 
 | Tool | Description |
 |:---|:---|
@@ -196,14 +182,48 @@ Exposes 4 tools:
 
 ---
 
+## Configuration
+
+CLAIM uses `~/.claim/config.toml`, generated on `claim init`:
+
+```toml
+[claim]
+port = 2626
+
+[vault]
+path = "~/Documents/Obsidian/MyVault"
+enabled = true
+
+[sweep]
+auto = true
+threshold = 50
+
+[privacy]
+redact_env = true
+redact_credentials = true
+```
+
+---
+
+## Docker
+
+For testing or isolated environments:
+
+```bash
+docker compose up -d --build
+docker exec -it claim-v3-test bash
+```
+
+---
+
 ## Contributing
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details. The short version:
+
 1. Fork the repo
-2. Create a feature branch (`git checkout -b feat/my-feature`)
+2. Create a feature branch
 3. Run `bun test` (119 tests must pass)
 4. Open a PR against `v3`
-
-Ideas: new capture triggers, vault templates, integrations beyond Obsidian.
 
 ---
 
@@ -214,5 +234,6 @@ Ideas: new capture triggers, vault templates, integrations beyond Obsidian.
 ---
 
 <p align="center">
-  Built by <a href="https://github.com/kuldeepluvani">Kuldeep Luvani</a>
+  Built by <a href="https://github.com/kuldeepluvani">Kuldeep Luvani</a><br>
+  <i>Inspired by the need for AI agents that remember what matters.</i>
 </p>
