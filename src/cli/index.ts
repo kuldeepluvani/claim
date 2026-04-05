@@ -138,12 +138,23 @@ async function hook(event: string) {
   const payload = await parseHookStdin();
   const result = await handleHookCli(event, payload, workerUrl);
 
-  // For session-start, if there's context data, print it for Claude to read
-  if (event === "session-start" && result.success && result.data) {
-    const data = result.data as { context?: string };
-    if (data.context) {
-      console.log(data.context);
+  // Output JSON that Claude Code expects from hooks
+  // See: https://code.claude.com/docs/en/hooks
+  if (result.success) {
+    const hookOutput: Record<string, unknown> = { continue: true };
+
+    if (event === "session-start") {
+      const data = result.data as { context?: string };
+      if (data?.context) {
+        hookOutput.hookSpecificOutput = {
+          hookEventName: "SessionStart",
+          additionalContext: data.context,
+        };
+      }
     }
+
+    // Write valid JSON to stdout for Claude Code to parse
+    process.stdout.write(JSON.stringify(hookOutput));
   }
 }
 

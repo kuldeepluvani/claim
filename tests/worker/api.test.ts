@@ -50,21 +50,23 @@ describe("Worker API", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         session_id: "test-sess-1",
-        repo: "claim",
-        branch: "v3",
+        cwd: "/workspace/claim",
       }),
     });
 
+    // Send in Claude Code's actual format: tool_input instead of content
     const res = await fetch(`${BASE}/hooks/post-tool-use`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         session_id: "test-sess-1",
         tool_name: "Edit",
-        file_path: "/src/index.ts",
-        content: "edited file content",
-        repo: "claim",
-        branch: "v3",
+        tool_input: {
+          file_path: "/src/index.ts",
+          old_string: "old code",
+          new_string: "new code",
+        },
+        cwd: "/workspace/claim",
       }),
     });
     expect(res.status).toBe(200);
@@ -87,8 +89,7 @@ describe("Worker API", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         session_id: "test-sess-2",
-        repo: "claim",
-        branch: "v3",
+        cwd: "/workspace/claim",
       }),
     });
     expect(res.status).toBe(200);
@@ -117,8 +118,7 @@ describe("Worker API", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         session_id: "test-sess-ctx",
-        repo: "test-repo",
-        branch: "main",
+        cwd: "/workspace/test-repo",
       }),
     });
     expect(res.status).toBe(200);
@@ -154,17 +154,18 @@ describe("Worker API", () => {
   });
 
   it("POST /api/sweep triggers sweep and returns results", async () => {
-    // Insert an observation that can be swept
+    // Insert an observation that can be swept (using Claude Code format)
     await fetch(`${BASE}/hooks/post-tool-use`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         session_id: "test-sess-1",
         tool_name: "Write",
-        file_path: "/src/sweep.ts",
-        content: "sweep test content for PROJ-999",
-        repo: "claim",
-        branch: "v3",
+        tool_input: {
+          file_path: "/src/sweep.ts",
+          content: "sweep test content for PROJ-999",
+        },
+        cwd: "/workspace/claim",
       }),
     });
 

@@ -53,16 +53,20 @@ export function createRoutes(db: ClaimDatabase) {
 
     hookSessionStart(body: Record<string, unknown>): Response {
       const sessionId = (body.session_id as string) || crypto.randomUUID();
+      // Claude Code sends cwd, not repo — extract repo name from cwd path
+      const cwd = body.cwd as string || "";
+      const repo = cwd.split("/").pop() || null;
+
       db.insertSession({
         id: sessionId,
-        repo: (body.repo as string) || null,
-        branch: (body.branch as string) || null,
+        repo: repo,
+        branch: null,
         started_at: new Date().toISOString(),
       });
       const contextResult = generateContext(
         db,
-        (body.repo as string) || null,
-        (body.branch as string) || null
+        repo,
+        null
       );
       return Response.json({ session_id: sessionId, context: contextResult.text });
     },
@@ -97,19 +101,50 @@ export function createRoutes(db: ClaimDatabase) {
     hookToolUse(body: Record<string, unknown>): Response {
       const sessionId = body.session_id as string;
       const toolName = body.tool_name as string;
-      const content = body.content as string;
 
       if (!sessionId || !toolName) {
         return Response.json({ captured: false, error: "session_id and tool_name required" }, { status: 400 });
       }
 
+      // Claude Code sends tool_input (object) not content (string)
+      // Extract meaningful content from tool_input based on tool type
+      const toolInput = body.tool_input as Record<string, unknown> | undefined;
+      let content = "";
+      let filePath: string | null = null;
+
+      if (toolInput) {
+        filePath = (toolInput.file_path as string) || null;
+        if (toolName === "Bash") {
+          content = (toolInput.command as string) || (toolInput.description as string) || "";
+        } else if (toolName === "Edit") {
+          const oldStr = (toolInput.old_string as string) || "";
+          const newStr = (toolInput.new_string as string) || "";
+          content = `Edit ${filePath || "file"}: replaced "${oldStr.slice(0, 100)}" with "${newStr.slice(0, 100)}"`;
+        } else if (toolName === "Write") {
+          const writeContent = (toolInput.content as string) || "";
+          content = `Write ${filePath || "file"} (${writeContent.length} chars)`;
+        } else {
+          content = JSON.stringify(toolInput).slice(0, 500);
+        }
+      }
+
+      // Also capture tool_response if present (PostToolUse has it)
+      const toolResponse = body.tool_response as Record<string, unknown> | undefined;
+      if (toolResponse && !content) {
+        content = JSON.stringify(toolResponse).slice(0, 500);
+      }
+
+      // Extract repo from cwd (Claude sends cwd, not repo)
+      const cwd = body.cwd as string || "";
+      const repo = cwd.split("/").pop() || null;
+
       const observationId = observer.capture({
         session_id: sessionId,
         tool_name: toolName,
-        file_path: (body.file_path as string) || null,
+        file_path: filePath || (body.file_path as string) || null,
         content: content || "",
-        repo: (body.repo as string) || null,
-        branch: (body.branch as string) || null,
+        repo: repo,
+        branch: null,
       });
 
       if (observationId) {
