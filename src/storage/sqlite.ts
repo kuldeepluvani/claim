@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { runMigrations } from "./migrations";
-import type { Observation, Session } from "../shared/types";
+import type { Observation, Session, Entity, Relationship, EntityType, RelationType } from "../shared/types";
+import { ulid } from "../shared/ulid";
 
 export class ClaimDatabase {
   private db: Database;
@@ -203,6 +204,146 @@ export class ClaimDatabase {
     const obs = this.db.query("SELECT COUNT(*) as count FROM observations").get() as { count: number };
     const sess = this.db.query("SELECT COUNT(*) as count FROM sessions").get() as { count: number };
     return { observations: obs.count, sessions: sess.count };
+  }
+
+  // --- Entity CRUD ---
+
+  upsertEntity(entity: { name: string; type: EntityType; aliases?: string[] }): string {
+    const existing = this.getEntityByName(entity.name);
+    const now = new Date().toISOString();
+
+    if (existing) {
+      this.db
+        .query(
+          `UPDATE entities SET last_seen = $last_seen, observation_count = observation_count + 1
+           WHERE id = $id`
+        )
+        .run({ $id: existing.id, $last_seen: now });
+      return existing.id;
+    }
+
+    const id = ulid();
+    this.db
+      .query(
+        `INSERT INTO entities (id, name, type, aliases, first_seen, last_seen, observation_count, vault_note_path)
+         VALUES ($id, $name, $type, $aliases, $first_seen, $last_seen, 1, NULL)`
+      )
+      .run({
+        $id: id,
+        $name: entity.name,
+        $type: entity.type,
+        $aliases: JSON.stringify(entity.aliases ?? []),
+        $first_seen: now,
+        $last_seen: now,
+      });
+    return id;
+  }
+
+  getEntity(id: string): Entity | null {
+    const row = this.db
+      .query("SELECT * FROM entities WHERE id = $id")
+      .get({ $id: id }) as Record<string, unknown> | null;
+
+    if (!row) return null;
+    return { ...row, aliases: JSON.parse(row.aliases as string) } as Entity;
+  }
+
+  getEntityByName(name: string): Entity | null {
+    const row = this.db
+      .query("SELECT * FROM entities WHERE name = $name")
+      .get({ $name: name }) as Record<string, unknown> | null;
+
+    if (!row) return null;
+    return { ...row, aliases: JSON.parse(row.aliases as string) } as Entity;
+  }
+
+  getEntities(type?: EntityType, limit: number = 100): Entity[] {
+    let query: string;
+    const params: Record<string, unknown> = { $limit: limit };
+
+    if (type) {
+      query = "SELECT * FROM entities WHERE type = $type ORDER BY last_seen DESC LIMIT $limit";
+      params.$type = type;
+    } else {
+      query = "SELECT * FROM entities ORDER BY last_seen DESC LIMIT $limit";
+    }
+
+    const rows = this.db.query(query).all(params) as Record<string, unknown>[];
+    return rows.map((row) => ({ ...row, aliases: JSON.parse(row.aliases as string) })) as Entity[];
+  }
+
+  // --- Relationship CRUD ---
+
+  insertRelationship(rel: {
+    source_id: string;
+    target_id: string;
+    rel_type: RelationType;
+    confidence?: number;
+    evidence?: string;
+  }): string {
+    const id = ulid();
+    this.db
+      .query(
+        `INSERT INTO relationships (id, source_id, target_id, rel_type, confidence, evidence, created_at)
+         VALUES ($id, $source_id, $target_id, $rel_type, $confidence, $evidence, $created_at)`
+      )
+      .run({
+        $id: id,
+        $source_id: rel.source_id,
+        $target_id: rel.target_id,
+        $rel_type: rel.rel_type,
+        $confidence: rel.confidence ?? 0.5,
+        $evidence: rel.evidence ?? null,
+        $created_at: new Date().toISOString(),
+      });
+    return id;
+  }
+
+  getRelationshipsFor(
+    entityId: string
+  ): Array<Relationship & { source_name: string; target_name: string }> {
+    const rows = this.db
+      .query(
+        `SELECT r.*, s.name as source_name, t.name as target_name
+         FROM relationships r
+         JOIN entities s ON r.source_id = s.id
+         JOIN entities t ON r.target_id = t.id
+         WHERE r.source_id = $id OR r.target_id = $id
+         ORDER BY r.created_at DESC`
+      )
+      .all({ $id: entityId }) as Array<Relationship & { source_name: string; target_name: string }>;
+    return rows;
+  }
+
+  getEntityGraph(entityId: string): {
+    entity: Entity;
+    relationships: Array<Relationship & { source_name: string; target_name: string }>;
+    related_entities: Entity[];
+  } | null {
+    const entity = this.getEntity(entityId);
+    if (!entity) return null;
+
+    const relationships = this.getRelationshipsFor(entityId);
+
+    const relatedIds = new Set<string>();
+    for (const rel of relationships) {
+      if (rel.source_id !== entityId) relatedIds.add(rel.source_id);
+      if (rel.target_id !== entityId) relatedIds.add(rel.target_id);
+    }
+
+    const related_entities: Entity[] = [];
+    for (const rid of relatedIds) {
+      const e = this.getEntity(rid);
+      if (e) related_entities.push(e);
+    }
+
+    return { entity, relationships, related_entities };
+  }
+
+  getGraphStats(): { entities: number; relationships: number } {
+    const ent = this.db.query("SELECT COUNT(*) as count FROM entities").get() as { count: number };
+    const rel = this.db.query("SELECT COUNT(*) as count FROM relationships").get() as { count: number };
+    return { entities: ent.count, relationships: rel.count };
   }
 
   close(): void {

@@ -1,6 +1,30 @@
 export type ObservationType = "tool_use" | "decision" | "discovery" | "error" | "summary";
 export type ObservationCategory = "code_change" | "deployment" | "test" | "debug" | "review" | "investigation" | null;
 
+export type EntityType = "service" | "person" | "concept" | "ticket" | "incident" | "tool" | "api";
+export type RelationType = "depends_on" | "caused" | "fixed_by" | "related_to" | "reviewed_by" | "deployed_to" | "uses";
+
+export interface Entity {
+  id: string;
+  name: string;
+  type: EntityType;
+  aliases: string[];
+  first_seen: string;
+  last_seen: string;
+  observation_count: number;
+  vault_note_path: string | null;
+}
+
+export interface Relationship {
+  id: string;
+  source_id: string;
+  target_id: string;
+  rel_type: RelationType;
+  confidence: number;
+  evidence: string | null;
+  created_at: string;
+}
+
 export interface Observation {
   id: string;
   session_id: string;

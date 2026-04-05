@@ -244,4 +244,85 @@ describe("ClaimDatabase", () => {
     expect(results[0].id).toBe("sess-3");
     expect(results[1].id).toBe("sess-1");
   });
+
+  // --- Graph Storage Tests ---
+
+  it("creates entities and relationships tables", () => {
+    const tables = db.listTables();
+    expect(tables).toContain("entities");
+    expect(tables).toContain("relationships");
+  });
+
+  it("upserts entity — creates new, returns id", () => {
+    const id = db.upsertEntity({ name: "claim", type: "service" });
+    expect(id).toBeTruthy();
+    expect(typeof id).toBe("string");
+
+    const entity = db.getEntity(id);
+    expect(entity).not.toBeNull();
+    expect(entity!.name).toBe("claim");
+    expect(entity!.type).toBe("service");
+    expect(entity!.observation_count).toBe(1);
+  });
+
+  it("upserts existing entity — increments count, same id", () => {
+    const id1 = db.upsertEntity({ name: "claim", type: "service" });
+    const id2 = db.upsertEntity({ name: "claim", type: "service" });
+
+    expect(id1).toBe(id2);
+
+    const entity = db.getEntity(id1);
+    expect(entity!.observation_count).toBe(2);
+  });
+
+  it("gets entity by name", () => {
+    db.upsertEntity({ name: "auth-service", type: "service", aliases: ["auth"] });
+
+    const entity = db.getEntityByName("auth-service");
+    expect(entity).not.toBeNull();
+    expect(entity!.name).toBe("auth-service");
+    expect(entity!.aliases).toEqual(["auth"]);
+  });
+
+  it("inserts relationship between entities", () => {
+    const sourceId = db.upsertEntity({ name: "claim", type: "service" });
+    const targetId = db.upsertEntity({ name: "sqlite", type: "tool" });
+
+    const relId = db.insertRelationship({
+      source_id: sourceId,
+      target_id: targetId,
+      rel_type: "uses",
+      confidence: 0.9,
+      evidence: "import statement",
+    });
+
+    expect(relId).toBeTruthy();
+  });
+
+  it("gets relationships for entity with names", () => {
+    const sourceId = db.upsertEntity({ name: "claim", type: "service" });
+    const targetId = db.upsertEntity({ name: "sqlite", type: "tool" });
+
+    db.insertRelationship({
+      source_id: sourceId,
+      target_id: targetId,
+      rel_type: "uses",
+    });
+
+    const rels = db.getRelationshipsFor(sourceId);
+    expect(rels.length).toBe(1);
+    expect(rels[0].source_name).toBe("claim");
+    expect(rels[0].target_name).toBe("sqlite");
+    expect(rels[0].rel_type).toBe("uses");
+  });
+
+  it("gets graph stats", () => {
+    const id1 = db.upsertEntity({ name: "claim", type: "service" });
+    const id2 = db.upsertEntity({ name: "sqlite", type: "tool" });
+    db.insertRelationship({ source_id: id1, target_id: id2, rel_type: "uses" });
+
+    const stats = db.getGraphStats();
+    expect(stats.entities).toBe(2);
+    expect(stats.relationships).toBe(1);
+  });
 });
