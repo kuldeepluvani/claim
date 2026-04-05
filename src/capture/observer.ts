@@ -1,6 +1,7 @@
 import { ClaimDatabase } from "../storage/sqlite";
 import { classifyObservation } from "./classifier";
 import { isPrivate } from "./privacy";
+import { extractEntities } from "../graph/entities";
 import { ulid } from "../shared/ulid";
 
 interface CaptureInput {
@@ -58,6 +59,19 @@ export class Observer {
       is_swept: false,
       is_private: isPrivateObs,
     });
+
+    // Real-time entity extraction — keeps graph fresh without waiting for sweep
+    if (!isPrivateObs) {
+      const entities = extractEntities({
+        repo: input.repo,
+        file_path: input.file_path,
+        content: truncated,
+        tool_name: input.tool_name,
+      });
+      for (const e of entities) {
+        this.db.upsertEntity({ name: e.name, type: e.type, aliases: e.aliases });
+      }
+    }
 
     return id;
   }

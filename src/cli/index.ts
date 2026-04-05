@@ -11,6 +11,43 @@ import { searchCommand } from "./search";
 const args = process.argv.slice(2);
 const command = args[0];
 
+async function sweepCommand(dryRun: boolean) {
+  const config = loadConfig();
+  const url = `http://localhost:${config.claim.port}`;
+
+  if (dryRun) {
+    try {
+      const db = new ClaimDatabase(PATHS.dbFile);
+      const unswept = db.getUnsweptObservations(100);
+      db.close();
+      console.log(`Sweep dry-run: ${unswept.length} unswept observations would be processed.`);
+    } catch {
+      console.error("Could not read database for dry-run.");
+    }
+    return;
+  }
+
+  try {
+    const res = await fetch(`${url}/api/sweep`, { method: "POST" });
+    const data = (await res.json()) as {
+      observations_processed: number;
+      entities_extracted: number;
+      relationships_extracted: number;
+      vault_notes_written: number;
+      observations_pruned: number;
+    };
+
+    console.log("Sweep complete:\n");
+    console.log("  Observations processed:", data.observations_processed);
+    console.log("  Entities extracted:    ", data.entities_extracted);
+    console.log("  Relationships:         ", data.relationships_extracted);
+    console.log("  Vault notes written:   ", data.vault_notes_written);
+    console.log("  Observations pruned:   ", data.observations_pruned);
+  } catch {
+    console.error("Sweep failed. Is the worker running? Start with: claim serve");
+  }
+}
+
 async function init() {
   console.log("Initializing CLAIM...\n");
 
@@ -132,6 +169,9 @@ async function main() {
     case "search":
       await searchCommand(args.slice(1));
       break;
+    case "sweep":
+      await sweepCommand(args.includes("--dry-run"));
+      break;
     case "mcp": {
       const { startMcpServer } = await import("../mcp/server");
       await startMcpServer();
@@ -142,7 +182,7 @@ async function main() {
       break;
     default:
       console.log(`Unknown command: ${command}`);
-      console.log("Usage: claim [init|status|serve|hook|search|mcp|version|uninstall]");
+      console.log("Usage: claim [init|status|serve|hook|search|sweep|mcp|version|uninstall]");
       process.exit(1);
   }
 }

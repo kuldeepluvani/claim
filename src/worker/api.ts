@@ -1,7 +1,8 @@
 import { ClaimDatabase } from "../storage/sqlite";
 import { Observer } from "../capture/observer";
-import { DEFAULT_CONFIG } from "../shared/config";
+import { DEFAULT_CONFIG, loadConfig } from "../shared/config";
 import { generateContext } from "../context/generator";
+import { SweepEngine } from "../sweep/engine";
 
 const startedAt = Date.now();
 
@@ -74,7 +75,22 @@ export function createRoutes(db: ClaimDatabase) {
           (body.knowledge_type as string) || "unknown"
         );
       }
-      return Response.json({ ended: true });
+
+      // Auto-trigger sweep if there are unswept observations
+      const unswept = db.getUnsweptObservations(1);
+      let swept = false;
+      if (unswept.length > 0) {
+        try {
+          const config = loadConfig();
+          const engine = new SweepEngine(db, config);
+          engine.sweep(); // fire-and-forget
+          swept = true;
+        } catch {
+          // Sweep failure is non-fatal
+        }
+      }
+
+      return Response.json({ ended: true, sweep_triggered: swept });
     },
 
     hookToolUse(body: Record<string, unknown>): Response {
@@ -107,6 +123,13 @@ export function createRoutes(db: ClaimDatabase) {
 
     hookStop(_body: Record<string, unknown>): Response {
       return Response.json({ received: true });
+    },
+
+    async hookSweep(): Promise<Response> {
+      const config = loadConfig();
+      const engine = new SweepEngine(db, config);
+      const result = await engine.sweep();
+      return Response.json(result);
     },
 
     graphStats(): Response {

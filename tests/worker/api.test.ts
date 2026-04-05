@@ -153,6 +153,34 @@ describe("Worker API", () => {
     expect(res.status).toBe(400);
   });
 
+  it("POST /api/sweep triggers sweep and returns results", async () => {
+    // Insert an observation that can be swept
+    await fetch(`${BASE}/hooks/post-tool-use`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: "test-sess-1",
+        tool_name: "Write",
+        file_path: "/src/sweep.ts",
+        content: "sweep test content for PROJ-999",
+        repo: "claim",
+        branch: "v3",
+      }),
+    });
+
+    const res = await fetch(`${BASE}/api/sweep`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(typeof body.observations_processed).toBe("number");
+    expect(typeof body.entities_extracted).toBe("number");
+    expect(typeof body.relationships_extracted).toBe("number");
+    expect(typeof body.vault_notes_written).toBe("number");
+    expect(typeof body.observations_pruned).toBe("number");
+  });
+
   it("returns 404 for unknown routes", async () => {
     const res = await fetch(`${BASE}/unknown`);
     expect(res.status).toBe(404);

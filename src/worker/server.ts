@@ -40,6 +40,7 @@ export function createServer(options: ServerOptions): { stop: () => void; port: 
           if (path === "/hooks/pre-tool-use") return routes.hookToolUse(body);
           if (path === "/hooks/user-prompt") return routes.hookUserPrompt(body);
           if (path === "/hooks/stop") return routes.hookStop(body);
+          if (path === "/api/sweep" || path === "/hooks/sweep") return routes.hookSweep();
         }
 
         return Response.json({ error: "not found" }, { status: 404 });
