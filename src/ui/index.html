@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CLAIM — Developer Knowledge OS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            claim: { DEFAULT: '#7C3AED', light: '#A78BFA', dark: '#5B21B6' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    code, .mono { font-family: 'JetBrains Mono', monospace; }
+    .glow { box-shadow: 0 0 15px rgba(124, 58, 237, 0.3); }
+    .nav-active { border-bottom: 2px solid #7C3AED; color: #A78BFA; }
+  </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+  <div id="app"></div>
+
+  <script type="module">
+    import { h, render } from 'https://esm.sh/preact@10.19.3';
+    import { useState, useEffect } from 'https://esm.sh/preact@10.19.3/hooks';
+    import htm from 'https://esm.sh/htm@3.1.1';
+
+    const html = htm.bind(h);
+
+    // API helper
+    const api = async (path) => {
+      try {
+        const res = await fetch(path);
+        return await res.json();
+      } catch { return null; }
+    };
+
+    // Navigation
+    function Nav({ active, onNavigate }) {
+      const tabs = ['dashboard', 'graph', 'timeline', 'search', 'vault'];
+      const icons = { dashboard: '📊', graph: '🔗', timeline: '📅', search: '🔍', vault: '📁' };
+
+      return html`
+        <nav class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">🧠</span>
+            <span class="text-xl font-bold text-claim-light">CLAIM</span>
+            <span class="text-xs text-gray-500 mono">v3</span>
+          </div>
+          <div class="flex gap-1">
+            ${tabs.map(tab => html`
+              <button
+                class="px-4 py-2 text-sm rounded-t ${active === tab ? 'nav-active font-medium' : 'text-gray-400 hover:text-gray-200'}"
+                onClick=${() => onNavigate(tab)}>
+                ${icons[tab]} ${tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            `)}
+          </div>
+          <div id="status-dot" class="flex items-center gap-2 text-xs text-gray-500">
+            <span class="w-2 h-2 rounded-full bg-green-500"></span> Connected
+          </div>
+        </nav>
+      `;
+    }
+
+    // Placeholder views (will be replaced in next tasks)
+    function Dashboard() {
+      return html`<div class="p-6"><h2 class="text-xl font-semibold mb-4">Dashboard</h2><p class="text-gray-400">Loading...</p></div>`;
+    }
+    function Graph() {
+      return html`<div class="p-6"><h2 class="text-xl font-semibold mb-4">Knowledge Graph</h2><p class="text-gray-400">Loading...</p></div>`;
+    }
+    function Timeline() {
+      return html`<div class="p-6"><h2 class="text-xl font-semibold mb-4">Timeline</h2><p class="text-gray-400">Loading...</p></div>`;
+    }
+    function Search() {
+      return html`<div class="p-6"><h2 class="text-xl font-semibold mb-4">Search</h2><p class="text-gray-400">Loading...</p></div>`;
+    }
+    function Vault() {
+      return html`<div class="p-6"><h2 class="text-xl font-semibold mb-4">Vault Browser</h2><p class="text-gray-400">Loading...</p></div>`;
+    }
+
+    // Router
+    const views = { dashboard: Dashboard, graph: Graph, timeline: Timeline, search: Search, vault: Vault };
+
+    function App() {
+      const [view, setView] = useState(location.hash.slice(1) || 'dashboard');
+      const [connected, setConnected] = useState(false);
+
+      useEffect(() => {
+        const handler = () => setView(location.hash.slice(1) || 'dashboard');
+        window.addEventListener('hashchange', handler);
+        return () => window.removeEventListener('hashchange', handler);
+      }, []);
+
+      // Check worker connectivity
+      useEffect(() => {
+        const check = async () => {
+          const data = await api('/health');
+          setConnected(data !== null);
+        };
+        check();
+        const interval = setInterval(check, 10000);
+        return () => clearInterval(interval);
+      }, []);
+
+      const navigate = (v) => { location.hash = v; setView(v); };
+      const View = views[view] || Dashboard;
+
+      return html`
+        <${Nav} active=${view} onNavigate=${navigate} />
+        <main class="max-w-7xl mx-auto">
+          <${View} />
+        </main>
+      `;
+    }
+
+    render(html`<${App} />`, document.getElementById('app'));
+  </script>
+</body>
+</html>

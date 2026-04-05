@@ -1,5 +1,8 @@
+import { join } from "path";
 import { ClaimDatabase } from "../storage/sqlite";
 import { createRoutes } from "./api";
+
+const corsHeaders = { "Access-Control-Allow-Origin": "*" };
 
 interface ServerOptions {
   port: number;
@@ -17,30 +20,60 @@ export function createServer(options: ServerOptions): { stop: () => void; port: 
       const method = req.method;
       const path = url.pathname;
 
+      // CORS preflight
+      if (method === "OPTIONS") {
+        return new Response(null, {
+          headers: {
+            ...corsHeaders,
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+          },
+        });
+      }
+
       try {
+        let response: Response | null = null;
+
         // GET routes
         if (method === "GET") {
-          if (path === "/health") return routes.health();
-          if (path === "/api/status") return routes.status();
-          if (path === "/api/observations") return routes.observations(url);
-          if (path === "/api/search") return routes.search(url);
-          if (path === "/api/graph/stats") return routes.graphStats();
-          if (path === "/api/graph/entities") return routes.graphEntities(url);
-          if (path === "/api/graph/entity") return routes.graphEntity(url);
-          if (path === "/api/graph/relationships") return routes.graphRelationships(url);
+          if (path === "/health") response = routes.health();
+          else if (path === "/api/status") response = routes.status();
+          else if (path === "/api/observations") response = routes.observations(url);
+          else if (path === "/api/search") response = routes.search(url);
+          else if (path === "/api/graph/stats") response = routes.graphStats();
+          else if (path === "/api/graph/entities") response = routes.graphEntities(url);
+          else if (path === "/api/graph/entity") response = routes.graphEntity(url);
+          else if (path === "/api/graph/relationships") response = routes.graphRelationships(url);
         }
 
         // POST routes
         if (method === "POST") {
           const body = await req.json().catch(() => ({}));
 
-          if (path === "/hooks/session-start") return routes.hookSessionStart(body);
-          if (path === "/hooks/session-end") return routes.hookSessionEnd(body);
-          if (path === "/hooks/post-tool-use") return routes.hookToolUse(body);
-          if (path === "/hooks/pre-tool-use") return routes.hookToolUse(body);
-          if (path === "/hooks/user-prompt") return routes.hookUserPrompt(body);
-          if (path === "/hooks/stop") return routes.hookStop(body);
-          if (path === "/api/sweep" || path === "/hooks/sweep") return routes.hookSweep();
+          if (path === "/hooks/session-start") response = routes.hookSessionStart(body);
+          else if (path === "/hooks/session-end") response = routes.hookSessionEnd(body);
+          else if (path === "/hooks/post-tool-use") response = routes.hookToolUse(body);
+          else if (path === "/hooks/pre-tool-use") response = routes.hookToolUse(body);
+          else if (path === "/hooks/user-prompt") response = routes.hookUserPrompt(body);
+          else if (path === "/hooks/stop") response = routes.hookStop(body);
+          else if (path === "/api/sweep" || path === "/hooks/sweep") response = await routes.hookSweep();
+        }
+
+        // Add CORS headers to API responses
+        if (response) {
+          const newHeaders = new Headers(response.headers);
+          for (const [k, v] of Object.entries(corsHeaders)) newHeaders.set(k, v);
+          return new Response(response.body, {
+            status: response.status,
+            headers: newHeaders,
+          });
+        }
+
+        // Static file serving for UI
+        const uiPath = path === "/" ? "/index.html" : path;
+        const file = Bun.file(join(import.meta.dir, "../ui", uiPath));
+        if (await file.exists()) {
+          return new Response(file);
         }
 
         return Response.json({ error: "not found" }, { status: 404 });
