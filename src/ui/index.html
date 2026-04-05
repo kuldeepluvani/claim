@@ -23,6 +23,8 @@
     code, .mono { font-family: 'JetBrains Mono', monospace; }
     .glow { box-shadow: 0 0 15px rgba(124, 58, 237, 0.3); }
     .nav-active { border-bottom: 2px solid #7C3AED; color: #A78BFA; }
+    @keyframes pulse-subtle { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.7; } }
+    .loading-pulse { animation: pulse-subtle 1.5s ease-in-out infinite; }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
@@ -30,8 +32,9 @@
 
   <script type="module">
     import { h, render } from 'https://esm.sh/preact@10.19.3';
-    import { useState, useEffect } from 'https://esm.sh/preact@10.19.3/hooks';
+    import { useState, useEffect, useRef, useCallback } from 'https://esm.sh/preact@10.19.3/hooks';
     import htm from 'https://esm.sh/htm@3.1.1';
+    import * as d3 from 'https://esm.sh/d3@7.9.0';
 
     const html = htm.bind(h);
 
@@ -39,26 +42,79 @@
     const api = async (path) => {
       try {
         const res = await fetch(path);
+        if (!res.ok) return null;
         return await res.json();
       } catch { return null; }
     };
 
+    // Debounce helper
+    function useDebounce(value, delay) {
+      const [debounced, setDebounced] = useState(value);
+      useEffect(() => {
+        const t = setTimeout(() => setDebounced(value), delay);
+        return () => clearTimeout(t);
+      }, [value, delay]);
+      return debounced;
+    }
+
+    // Format relative time
+    function timeAgo(ts) {
+      if (!ts) return '';
+      const diff = Date.now() - new Date(ts).getTime();
+      const s = Math.floor(diff / 1000);
+      if (s < 60) return s + 's ago';
+      const m = Math.floor(s / 60);
+      if (m < 60) return m + 'm ago';
+      const hr = Math.floor(m / 60);
+      if (hr < 24) return hr + 'h ago';
+      const d = Math.floor(hr / 24);
+      return d + 'd ago';
+    }
+
+    // Format uptime
+    function formatUptime(seconds) {
+      if (!seconds && seconds !== 0) return '--';
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      if (h > 0) return h + 'h ' + m + 'm';
+      if (m > 0) return m + 'm ' + s + 's';
+      return s + 's';
+    }
+
+    // Category colors
+    const catColors = {
+      code_change: { bg: 'bg-blue-500/20', text: 'text-blue-400', border: 'border-blue-500' },
+      deployment: { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500' },
+      test: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500' },
+      debug: { bg: 'bg-orange-500/20', text: 'text-orange-400', border: 'border-orange-500' },
+      review: { bg: 'bg-purple-500/20', text: 'text-purple-400', border: 'border-purple-500' },
+      investigation: { bg: 'bg-cyan-500/20', text: 'text-cyan-400', border: 'border-cyan-500' },
+    };
+    const defaultCat = { bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-600' };
+    function getCatStyle(cat) { return catColors[cat] || defaultCat; }
+
+    // Loading placeholder
+    function LoadingCard() {
+      return html`<div class="bg-gray-900 rounded-lg border border-gray-800 p-6 loading-pulse"><div class="h-4 bg-gray-800 rounded w-3/4 mb-3"></div><div class="h-3 bg-gray-800 rounded w-1/2"></div></div>`;
+    }
+
     // Navigation
     function Nav({ active, onNavigate }) {
       const tabs = ['dashboard', 'graph', 'timeline', 'search', 'vault'];
-      const icons = { dashboard: '📊', graph: '🔗', timeline: '📅', search: '🔍', vault: '📁' };
+      const icons = { dashboard: '\u{1F4CA}', graph: '\u{1F517}', timeline: '\u{1F4C5}', search: '\u{1F50D}', vault: '\u{1F4C1}' };
 
       return html`
         <nav class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <span class="text-2xl">🧠</span>
+            <span class="text-2xl">\u{1F9E0}</span>
             <span class="text-xl font-bold text-claim-light">CLAIM</span>
             <span class="text-xs text-gray-500 mono">v3</span>
           </div>
           <div class="flex gap-1">
             ${tabs.map(tab => html`
               <button
-                class="px-4 py-2 text-sm rounded-t ${active === tab ? 'nav-active font-medium' : 'text-gray-400 hover:text-gray-200'}"
+                class="px-4 py-2 text-sm rounded-t ${active === tab ? 'nav-active font-medium' : 'text-gray-400 hover:text-gray-200'} transition-all duration-200"
                 onClick=${() => onNavigate(tab)}>
                 ${icons[tab]} ${tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
@@ -71,21 +127,558 @@
       `;
     }
 
-    // Placeholder views (will be replaced in next tasks)
+    // ==================== DASHBOARD ====================
     function Dashboard() {
-      return html`<div class="p-6"><h2 class="text-xl font-semibold mb-4">Dashboard</h2><p class="text-gray-400">Loading...</p></div>`;
+      const [status, setStatus] = useState(null);
+      const [graphStats, setGraphStats] = useState(null);
+      const [recent, setRecent] = useState(null);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        async function load() {
+          const [s, g, r] = await Promise.all([
+            api('/api/status'),
+            api('/api/graph/stats'),
+            api('/api/timeline?limit=15'),
+          ]);
+          setStatus(s);
+          setGraphStats(g);
+          setRecent(r);
+          setLoading(false);
+        }
+        load();
+        const iv = setInterval(load, 15000);
+        return () => clearInterval(iv);
+      }, []);
+
+      if (loading) return html`<div class="p-6 grid grid-cols-5 gap-4">${[1,2,3,4,5].map(() => html`<${LoadingCard} />`)}</div>`;
+
+      const obs = status?.observations ?? 0;
+      const sess = status?.sessions ?? 0;
+      const ents = graphStats?.entities ?? 0;
+      const rels = graphStats?.relationships ?? 0;
+      const uptime = status?.uptime ?? 0;
+
+      const cards = [
+        { label: 'Observations', value: obs, color: 'from-purple-600 to-purple-800' },
+        { label: 'Sessions', value: sess, color: 'from-blue-600 to-blue-800' },
+        { label: 'Entities', value: ents, color: 'from-cyan-600 to-cyan-800' },
+        { label: 'Relationships', value: rels, color: 'from-green-600 to-green-800' },
+        { label: 'Uptime', value: formatUptime(uptime), color: 'from-gray-600 to-gray-800' },
+      ];
+
+      const observations = recent?.observations || [];
+
+      return html`
+        <div class="p-6">
+          <div class="grid grid-cols-5 gap-4 mb-8">
+            ${cards.map(c => html`
+              <div class="bg-gradient-to-br ${c.color} rounded-lg p-5 border border-gray-700/50">
+                <div class="text-3xl font-bold mb-1">${c.value}</div>
+                <div class="text-sm text-gray-300">${c.label}</div>
+              </div>
+            `)}
+          </div>
+
+          <h3 class="text-lg font-semibold mb-4 text-gray-200">Recent Activity</h3>
+          ${observations.length === 0 ? html`
+            <div class="text-center py-12 text-gray-500">
+              <div class="text-4xl mb-3">\u{1F4ED}</div>
+              <p>No observations yet. Start a coding session to see activity here.</p>
+            </div>
+          ` : html`
+            <div class="space-y-3">
+              ${observations.map(o => {
+                const cs = getCatStyle(o.category);
+                return html`
+                  <div class="bg-gray-900 rounded-lg border border-gray-800 p-4 flex items-start gap-4 hover:border-gray-700 transition-all duration-200">
+                    <div class="border-l-2 ${cs.border} pl-3 flex-1 min-w-0">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xs ${cs.bg} ${cs.text} px-2 py-0.5 rounded-full font-medium">${o.category || o.type}</span>
+                        ${o.repo ? html`<span class="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded mono">${o.repo}</span>` : null}
+                        ${o.tool_name ? html`<span class="text-xs text-gray-600 mono">${o.tool_name}</span>` : null}
+                        <span class="text-xs text-gray-600 ml-auto">${timeAgo(o.timestamp)}</span>
+                      </div>
+                      <p class="text-sm text-gray-300 truncate">${o.content?.slice(0, 200) || '(no content)'}</p>
+                      ${o.file_path ? html`<p class="text-xs text-gray-600 mono mt-1 truncate">${o.file_path}</p>` : null}
+                    </div>
+                  </div>
+                `;
+              })}
+            </div>
+          `}
+        </div>
+      `;
     }
-    function Graph() {
-      return html`<div class="p-6"><h2 class="text-xl font-semibold mb-4">Knowledge Graph</h2><p class="text-gray-400">Loading...</p></div>`;
-    }
+
+    // ==================== TIMELINE ====================
     function Timeline() {
-      return html`<div class="p-6"><h2 class="text-xl font-semibold mb-4">Timeline</h2><p class="text-gray-400">Loading...</p></div>`;
+      const [observations, setObservations] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [limit, setLimit] = useState(50);
+      const [filterType, setFilterType] = useState('all');
+      const [filterRepo, setFilterRepo] = useState('');
+
+      useEffect(() => {
+        async function load() {
+          setLoading(true);
+          const data = await api('/api/timeline?limit=' + limit);
+          setObservations(data?.observations || []);
+          setLoading(false);
+        }
+        load();
+      }, [limit]);
+
+      const filtered = observations.filter(o => {
+        if (filterType !== 'all' && o.category !== filterType) return false;
+        if (filterRepo && o.repo && !o.repo.toLowerCase().includes(filterRepo.toLowerCase())) return false;
+        if (filterRepo && !o.repo) return false;
+        return true;
+      });
+
+      // Group by session
+      let lastSession = null;
+
+      return html`
+        <div class="p-6">
+          <div class="flex items-center gap-4 mb-6">
+            <h2 class="text-xl font-semibold">Timeline</h2>
+            <div class="flex items-center gap-3 ml-auto">
+              <select
+                class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-gray-300 focus:border-claim focus:outline-none"
+                value=${filterType}
+                onChange=${e => setFilterType(e.target.value)}>
+                <option value="all">All types</option>
+                <option value="code_change">Code Change</option>
+                <option value="deployment">Deployment</option>
+                <option value="test">Test</option>
+                <option value="debug">Debug</option>
+                <option value="review">Review</option>
+                <option value="investigation">Investigation</option>
+              </select>
+              <input
+                type="text"
+                placeholder="Filter by repo..."
+                class="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm text-gray-300 placeholder-gray-600 focus:border-claim focus:outline-none w-48"
+                value=${filterRepo}
+                onInput=${e => setFilterRepo(e.target.value)}
+              />
+            </div>
+          </div>
+
+          ${loading ? html`<div class="space-y-3">${[1,2,3,4,5].map(() => html`<${LoadingCard} />`)}</div>` : html`
+            ${filtered.length === 0 ? html`
+              <div class="text-center py-16 text-gray-500">
+                <div class="text-4xl mb-3">\u{1F50D}</div>
+                <p>No observations match your filters.</p>
+              </div>
+            ` : html`
+              <div class="space-y-2">
+                ${filtered.map((o, i) => {
+                  const cs = getCatStyle(o.category);
+                  const showDivider = o.session_id !== lastSession && i > 0;
+                  lastSession = o.session_id;
+                  return html`
+                    ${showDivider ? html`<div class="border-t border-gray-800 my-4 flex items-center"><span class="text-xs text-gray-600 bg-gray-950 px-2 -mt-px">Session boundary</span></div>` : null}
+                    <div class="bg-gray-900 rounded border border-gray-800 p-3 flex items-start gap-3 hover:border-gray-700 transition-all duration-200">
+                      <div class="w-1 self-stretch rounded ${cs.border} flex-shrink-0"></div>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 mb-1 flex-wrap">
+                          <span class="text-xs ${cs.bg} ${cs.text} px-2 py-0.5 rounded-full font-medium">${o.category || o.type}</span>
+                          ${o.tool_name ? html`<span class="text-xs text-gray-500 mono">${o.tool_name}</span>` : null}
+                          ${o.repo ? html`<span class="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded mono">${o.repo}</span>` : null}
+                          <span class="text-xs text-gray-600 ml-auto flex-shrink-0">${new Date(o.timestamp).toLocaleString()}</span>
+                        </div>
+                        <p class="text-sm text-gray-300">${o.content?.slice(0, 300) || '(no content)'}</p>
+                        ${o.file_path ? html`<p class="text-xs text-gray-600 mono mt-1 truncate">${o.file_path}</p>` : null}
+                      </div>
+                    </div>
+                  `;
+                })}
+              </div>
+
+              <div class="mt-6 text-center">
+                <button
+                  class="bg-gray-800 hover:bg-gray-700 text-gray-300 px-6 py-2 rounded text-sm transition-all duration-200 border border-gray-700"
+                  onClick=${() => setLimit(l => l + 50)}>
+                  Load more
+                </button>
+              </div>
+            `}
+          `}
+        </div>
+      `;
     }
+
+    // ==================== KNOWLEDGE GRAPH ====================
+    function Graph() {
+      const svgRef = useRef(null);
+      const containerRef = useRef(null);
+      const [selectedEntity, setSelectedEntity] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(null);
+      const [entityDetails, setEntityDetails] = useState(null);
+
+      const entityColors = {
+        service: '#3B82F6',
+        person: '#22C55E',
+        ticket: '#EAB308',
+        incident: '#EF4444',
+        concept: '#A855F7',
+        tool: '#6B7280',
+        api: '#06B6D4',
+      };
+
+      useEffect(() => {
+        async function load() {
+          const data = await api('/api/graph/all');
+          if (!data || !data.entities || data.entities.length === 0) {
+            setLoading(false);
+            setError('no_data');
+            return;
+          }
+
+          setLoading(false);
+          buildGraph(data.entities, data.relationships);
+        }
+        load();
+      }, []);
+
+      // Fetch entity details on selection
+      useEffect(() => {
+        if (!selectedEntity) { setEntityDetails(null); return; }
+        api('/api/graph/entity?name=' + encodeURIComponent(selectedEntity.name)).then(d => setEntityDetails(d));
+      }, [selectedEntity]);
+
+      function buildGraph(entities, relationships) {
+        const svg = d3.select(svgRef.current);
+        svg.selectAll('*').remove();
+
+        const container = containerRef.current;
+        const width = container?.clientWidth || 900;
+        const height = 600;
+
+        svg.attr('width', width).attr('height', height);
+
+        // Build lookup
+        const entityById = new Map(entities.map(e => [e.id, e]));
+
+        const nodes = entities.map(e => ({
+          id: e.id,
+          name: e.name,
+          type: e.type,
+          observation_count: e.observation_count,
+          radius: Math.max(8, Math.min(30, 6 + Math.sqrt(e.observation_count) * 4)),
+        }));
+
+        const nodeIds = new Set(nodes.map(n => n.id));
+        const links = relationships
+          .filter(r => nodeIds.has(r.source_id) && nodeIds.has(r.target_id))
+          .map(r => ({
+            source: r.source_id,
+            target: r.target_id,
+            rel_type: r.rel_type,
+          }));
+
+        const g = svg.append('g');
+
+        // Zoom
+        const zoom = d3.zoom()
+          .scaleExtent([0.2, 5])
+          .on('zoom', (event) => g.attr('transform', event.transform));
+        svg.call(zoom);
+
+        // Simulation
+        const simulation = d3.forceSimulation(nodes)
+          .force('link', d3.forceLink(links).id(d => d.id).distance(100))
+          .force('charge', d3.forceManyBody().strength(-200))
+          .force('center', d3.forceCenter(width / 2, height / 2))
+          .force('collision', d3.forceCollide().radius(d => d.radius + 5));
+
+        // Links
+        const link = g.append('g')
+          .selectAll('line')
+          .data(links)
+          .join('line')
+          .attr('stroke', '#374151')
+          .attr('stroke-width', 1)
+          .attr('stroke-opacity', 0.6);
+
+        // Link labels
+        const linkLabel = g.append('g')
+          .selectAll('text')
+          .data(links)
+          .join('text')
+          .text(d => d.rel_type)
+          .attr('font-size', 8)
+          .attr('fill', '#6B7280')
+          .attr('text-anchor', 'middle')
+          .attr('font-family', 'JetBrains Mono, monospace');
+
+        // Nodes
+        const node = g.append('g')
+          .selectAll('circle')
+          .data(nodes)
+          .join('circle')
+          .attr('r', d => d.radius)
+          .attr('fill', d => entityColors[d.type] || '#6B7280')
+          .attr('stroke', '#1F2937')
+          .attr('stroke-width', 2)
+          .attr('cursor', 'pointer')
+          .on('click', (event, d) => {
+            event.stopPropagation();
+            setSelectedEntity(entityById.get(d.id));
+          })
+          .on('mouseenter', function(event, d) {
+            d3.select(this)
+              .attr('stroke', '#A78BFA')
+              .attr('stroke-width', 3)
+              .style('filter', 'drop-shadow(0 0 8px rgba(124, 58, 237, 0.5))');
+          })
+          .on('mouseleave', function() {
+            d3.select(this)
+              .attr('stroke', '#1F2937')
+              .attr('stroke-width', 2)
+              .style('filter', null);
+          })
+          .call(d3.drag()
+            .on('start', (event, d) => { if (!event.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+            .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+            .on('end', (event, d) => { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+          );
+
+        // Labels
+        const label = g.append('g')
+          .selectAll('text')
+          .data(nodes)
+          .join('text')
+          .text(d => d.name)
+          .attr('font-size', 10)
+          .attr('fill', '#D1D5DB')
+          .attr('text-anchor', 'middle')
+          .attr('dy', d => d.radius + 14)
+          .attr('font-family', 'Inter, sans-serif')
+          .attr('pointer-events', 'none');
+
+        // Click on background to deselect
+        svg.on('click', () => setSelectedEntity(null));
+
+        simulation.on('tick', () => {
+          link
+            .attr('x1', d => d.source.x)
+            .attr('y1', d => d.source.y)
+            .attr('x2', d => d.target.x)
+            .attr('y2', d => d.target.y);
+          linkLabel
+            .attr('x', d => (d.source.x + d.target.x) / 2)
+            .attr('y', d => (d.source.y + d.target.y) / 2);
+          node
+            .attr('cx', d => d.x)
+            .attr('cy', d => d.y);
+          label
+            .attr('x', d => d.x)
+            .attr('y', d => d.y);
+        });
+      }
+
+      if (loading) return html`<div class="p-6"><${LoadingCard} /></div>`;
+
+      if (error === 'no_data') {
+        return html`
+          <div class="p-6 text-center py-20 text-gray-500">
+            <div class="text-5xl mb-4">\u{1F578}\u{FE0F}</div>
+            <h3 class="text-lg font-medium text-gray-400 mb-2">No graph data yet</h3>
+            <p>Entities and relationships are extracted during sweep cycles. Keep coding and the graph will populate.</p>
+          </div>
+        `;
+      }
+
+      return html`
+        <div class="p-6 flex gap-4" ref=${containerRef}>
+          <div class="flex-1 bg-gray-900 rounded-lg border border-gray-800 overflow-hidden relative">
+            <svg ref=${svgRef} style="width:100%;height:600px;"></svg>
+            <div class="absolute top-3 left-3 flex flex-wrap gap-2">
+              ${Object.entries(entityColors).map(([type, color]) => html`
+                <span class="text-xs px-2 py-0.5 rounded-full border border-gray-700 bg-gray-900/80 flex items-center gap-1">
+                  <span class="w-2 h-2 rounded-full inline-block" style="background:${color}"></span>
+                  ${type}
+                </span>
+              `)}
+            </div>
+          </div>
+          ${selectedEntity ? html`
+            <div class="w-80 bg-gray-900 rounded-lg border border-gray-800 p-4 flex-shrink-0 self-start">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="w-3 h-3 rounded-full" style="background:${entityColors[selectedEntity.type] || '#6B7280'}"></span>
+                <h3 class="font-semibold text-gray-200">${selectedEntity.name}</h3>
+              </div>
+              <div class="space-y-2 text-sm">
+                <div class="flex justify-between"><span class="text-gray-500">Type</span><span class="text-gray-300">${selectedEntity.type}</span></div>
+                <div class="flex justify-between"><span class="text-gray-500">Observations</span><span class="text-gray-300">${selectedEntity.observation_count}</span></div>
+                <div class="flex justify-between"><span class="text-gray-500">First seen</span><span class="text-gray-300">${timeAgo(selectedEntity.first_seen)}</span></div>
+                <div class="flex justify-between"><span class="text-gray-500">Last seen</span><span class="text-gray-300">${timeAgo(selectedEntity.last_seen)}</span></div>
+              </div>
+              ${entityDetails?.relationships?.length > 0 ? html`
+                <div class="mt-4 border-t border-gray-800 pt-3">
+                  <h4 class="text-xs text-gray-500 uppercase tracking-wider mb-2">Relationships</h4>
+                  <div class="space-y-1 max-h-60 overflow-y-auto">
+                    ${entityDetails.relationships.map(r => html`
+                      <div class="text-xs text-gray-400 flex items-center gap-1">
+                        <span class="mono text-claim-light">${r.rel_type}</span>
+                        <span class="text-gray-600">\u{2192}</span>
+                        <span>${entityDetails.related_entities?.find(e => e.id === r.target_id || e.id === r.source_id)?.name || '...'}</span>
+                      </div>
+                    `)}
+                  </div>
+                </div>
+              ` : null}
+            </div>
+          ` : null}
+        </div>
+      `;
+    }
+
+    // ==================== SEARCH ====================
     function Search() {
-      return html`<div class="p-6"><h2 class="text-xl font-semibold mb-4">Search</h2><p class="text-gray-400">Loading...</p></div>`;
+      const [query, setQuery] = useState('');
+      const [results, setResults] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const debouncedQuery = useDebounce(query, 300);
+
+      useEffect(() => {
+        if (!debouncedQuery || debouncedQuery.length < 2) { setResults(null); return; }
+        async function doSearch() {
+          setLoading(true);
+          const data = await api('/api/search?q=' + encodeURIComponent(debouncedQuery) + '&limit=30');
+          setResults(data?.results || []);
+          setLoading(false);
+        }
+        doSearch();
+      }, [debouncedQuery]);
+
+      return html`
+        <div class="p-6">
+          <div class="max-w-3xl mx-auto">
+            <div class="relative mb-8">
+              <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-lg">\u{1F50D}</span>
+              <input
+                type="text"
+                placeholder="Search observations, code changes, decisions..."
+                class="w-full bg-gray-900 border border-gray-700 rounded-lg pl-12 pr-4 py-3.5 text-gray-200 placeholder-gray-600 focus:border-claim focus:outline-none focus:ring-1 focus:ring-claim/30 text-lg transition-all duration-200"
+                value=${query}
+                onInput=${e => setQuery(e.target.value)}
+                autofocus
+              />
+            </div>
+
+            ${loading ? html`<div class="space-y-3">${[1,2,3].map(() => html`<${LoadingCard} />`)}</div>` : null}
+
+            ${!loading && results === null && !query ? html`
+              <div class="text-center py-16 text-gray-500">
+                <div class="text-5xl mb-4">\u{1F50E}</div>
+                <p class="text-lg mb-2">Search your development history</p>
+                <p class="text-sm">Try searching for file names, error messages, or feature descriptions.</p>
+              </div>
+            ` : null}
+
+            ${!loading && results !== null && results.length === 0 ? html`
+              <div class="text-center py-16 text-gray-500">
+                <div class="text-4xl mb-3">\u{1F6AB}</div>
+                <p class="text-lg mb-1">No results found</p>
+                <p class="text-sm">Try different keywords or check spelling. Full-text search matches against observation content.</p>
+              </div>
+            ` : null}
+
+            ${!loading && results && results.length > 0 ? html`
+              <div class="text-xs text-gray-500 mb-3">${results.length} result${results.length !== 1 ? 's' : ''}</div>
+              <div class="space-y-2">
+                ${results.map(o => {
+                  const cs = getCatStyle(o.category);
+                  return html`
+                    <div class="bg-gray-900 rounded border border-gray-800 p-3 hover:border-gray-700 transition-all duration-200">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xs ${cs.bg} ${cs.text} px-2 py-0.5 rounded-full font-medium">${o.category || o.type}</span>
+                        ${o.repo ? html`<span class="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded mono">${o.repo}</span>` : null}
+                        ${o.tool_name ? html`<span class="text-xs text-gray-600 mono">${o.tool_name}</span>` : null}
+                        <span class="text-xs text-gray-600 ml-auto">${timeAgo(o.timestamp)}</span>
+                      </div>
+                      <p class="text-sm text-gray-300">${o.content?.slice(0, 250) || '(no content)'}</p>
+                      ${o.file_path ? html`<p class="text-xs text-gray-600 mono mt-1 truncate">${o.file_path}</p>` : null}
+                    </div>
+                  `;
+                })}
+              </div>
+            ` : null}
+          </div>
+        </div>
+      `;
     }
+
+    // ==================== VAULT BROWSER ====================
     function Vault() {
-      return html`<div class="p-6"><h2 class="text-xl font-semibold mb-4">Vault Browser</h2><p class="text-gray-400">Loading...</p></div>`;
+      const [config, setConfig] = useState(null);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        api('/api/config').then(d => { setConfig(d); setLoading(false); });
+      }, []);
+
+      if (loading) return html`<div class="p-6"><${LoadingCard} /></div>`;
+
+      const vaults = config?.vaults?.entries || [];
+      const hasVaults = vaults.length > 0;
+
+      return html`
+        <div class="p-6">
+          <h2 class="text-xl font-semibold mb-6">Vault Browser</h2>
+
+          <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="bg-gray-900 rounded-lg border border-gray-800 p-4">
+              <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Capture Mode</div>
+              <div class="text-sm font-medium text-gray-200">${config?.capture_mode || '--'}</div>
+            </div>
+            <div class="bg-gray-900 rounded-lg border border-gray-800 p-4">
+              <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Sweep</div>
+              <div class="text-sm font-medium text-gray-200">${config?.sweep_enabled ? 'Enabled' : 'Disabled'}</div>
+            </div>
+            <div class="bg-gray-900 rounded-lg border border-gray-800 p-4">
+              <div class="text-xs text-gray-500 uppercase tracking-wider mb-1">Context Injection</div>
+              <div class="text-sm font-medium text-gray-200">${config?.context_enabled ? 'Enabled' : 'Disabled'}</div>
+            </div>
+          </div>
+
+          ${hasVaults ? html`
+            <h3 class="text-lg font-medium mb-4 text-gray-300">Configured Vaults</h3>
+            <div class="space-y-3">
+              ${vaults.map(v => html`
+                <div class="bg-gray-900 rounded-lg border border-gray-800 p-4 hover:border-gray-700 transition-all duration-200">
+                  <div class="flex items-center gap-3 mb-2">
+                    <span class="text-lg">\u{1F4C2}</span>
+                    <h4 class="font-medium text-gray-200">${v.name}</h4>
+                    ${config?.vaults?.default === v.name ? html`<span class="text-xs bg-claim/20 text-claim-light px-2 py-0.5 rounded-full">default</span>` : null}
+                  </div>
+                  <p class="text-sm text-gray-400 mb-1">${v.purpose || 'No description'}</p>
+                  <p class="text-xs text-gray-600 mono">${v.path}</p>
+                  ${v.routes?.length > 0 ? html`
+                    <div class="mt-2 flex flex-wrap gap-1">
+                      ${v.routes.map(r => html`
+                        <span class="text-xs bg-gray-800 text-gray-500 px-2 py-0.5 rounded">${r.folder}</span>
+                      `)}
+                    </div>
+                  ` : null}
+                </div>
+              `)}
+            </div>
+          ` : html`
+            <div class="text-center py-16 bg-gray-900 rounded-lg border border-gray-800">
+              <div class="text-5xl mb-4">\u{1F4C1}</div>
+              <h3 class="text-lg font-medium text-gray-400 mb-2">No vaults configured</h3>
+              <p class="text-sm text-gray-500 mb-4">Vault browser requires vault configuration to display files.</p>
+              <p class="text-sm text-gray-600 mono">Run <span class="text-claim-light">claim config</span> to set up vaults.</p>
+            </div>
+          `}
+        </div>
+      `;
     }
 
     // Router
