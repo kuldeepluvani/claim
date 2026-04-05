@@ -3,6 +3,7 @@ import { Observer } from "../capture/observer";
 import { DEFAULT_CONFIG, loadConfig } from "../shared/config";
 import { generateContext } from "../context/generator";
 import { SweepEngine } from "../sweep/engine";
+import type { Relationship } from "../shared/types";
 
 const startedAt = Date.now();
 
@@ -164,6 +165,36 @@ export function createRoutes(db: ClaimDatabase) {
       }
       const relationships = db.getRelationshipsFor(entityId);
       return Response.json({ relationships });
+    },
+
+    graphAll(): Response {
+      const entities = db.getEntities(undefined, 200);
+      const allRels: Relationship[] = [];
+      for (const e of entities) {
+        const rels = db.getRelationshipsFor(e.id);
+        allRels.push(...rels);
+      }
+      const uniqueRels = [...new Map(allRels.map(r => [r.id, r])).values()];
+      return Response.json({ entities, relationships: uniqueRels });
+    },
+
+    timeline(url: URL): Response {
+      const limit = parseInt(url.searchParams.get("limit") || "50", 10);
+      const from = url.searchParams.get("from") || undefined;
+      const to = url.searchParams.get("to") || undefined;
+      const observations = db.getTimeline(from, to, limit);
+      return Response.json({ observations });
+    },
+
+    config(): Response {
+      const config = loadConfig();
+      return Response.json({
+        vaults: config.vaults,
+        capture_mode: config.capture.mode,
+        sweep_enabled: config.sweep.enabled,
+        context_enabled: config.context.enabled,
+        port: config.claim.port,
+      });
     },
   };
 }

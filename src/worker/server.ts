@@ -44,6 +44,9 @@ export function createServer(options: ServerOptions): { stop: () => void; port: 
           else if (path === "/api/graph/entities") response = routes.graphEntities(url);
           else if (path === "/api/graph/entity") response = routes.graphEntity(url);
           else if (path === "/api/graph/relationships") response = routes.graphRelationships(url);
+          else if (path === "/api/graph/all") response = routes.graphAll();
+          else if (path === "/api/timeline") response = routes.timeline(url);
+          else if (path === "/api/config") response = routes.config();
         }
 
         // POST routes
