@@ -129,6 +129,76 @@ export class ClaimDatabase {
     })) as Observation[];
   }
 
+  getRecentSessions(limit: number = 10): Session[] {
+    return this.db
+      .query("SELECT * FROM sessions ORDER BY started_at DESC LIMIT $limit")
+      .all({ $limit: limit }) as Session[];
+  }
+
+  getObservationsBySession(sessionId: string): Observation[] {
+    const rows = this.db
+      .query(
+        `SELECT * FROM observations WHERE session_id = $id AND is_private = 0
+         ORDER BY timestamp ASC`
+      )
+      .all({ $id: sessionId }) as Record<string, unknown>[];
+
+    return rows.map((row) => ({
+      ...row,
+      is_swept: row.is_swept === 1,
+      is_private: row.is_private === 1,
+    })) as Observation[];
+  }
+
+  getTimeline(from?: string, to?: string, limit: number = 50): Observation[] {
+    const conditions: string[] = ["is_private = 0"];
+    const params: Record<string, unknown> = { $limit: limit };
+
+    if (from) {
+      conditions.push("timestamp >= $from");
+      params.$from = from;
+    }
+    if (to) {
+      conditions.push("timestamp <= $to");
+      params.$to = to;
+    }
+
+    const where = conditions.join(" AND ");
+    const rows = this.db
+      .query(`SELECT * FROM observations WHERE ${where} ORDER BY timestamp DESC LIMIT $limit`)
+      .all(params) as Record<string, unknown>[];
+
+    return rows.map((row) => ({
+      ...row,
+      is_swept: row.is_swept === 1,
+      is_private: row.is_private === 1,
+    })) as Observation[];
+  }
+
+  getObservationsByIds(ids: string[]): Observation[] {
+    if (ids.length === 0) return [];
+
+    const placeholders = ids.map((_, i) => `$id${i}`).join(", ");
+    const params: Record<string, unknown> = {};
+    ids.forEach((id, i) => { params[`$id${i}`] = id; });
+
+    const rows = this.db
+      .query(`SELECT * FROM observations WHERE id IN (${placeholders}) AND is_private = 0`)
+      .all(params) as Record<string, unknown>[];
+
+    return rows.map((row) => ({
+      ...row,
+      is_swept: row.is_swept === 1,
+      is_private: row.is_private === 1,
+    })) as Observation[];
+  }
+
+  getSessionsByRepo(repo: string, limit: number = 5): Session[] {
+    return this.db
+      .query("SELECT * FROM sessions WHERE repo = $repo ORDER BY started_at DESC LIMIT $limit")
+      .all({ $repo: repo, $limit: limit }) as Session[];
+  }
+
   getCounts(): { observations: number; sessions: number } {
     const obs = this.db.query("SELECT COUNT(*) as count FROM observations").get() as { count: number };
     const sess = this.db.query("SELECT COUNT(*) as count FROM sessions").get() as { count: number };
