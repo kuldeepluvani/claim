@@ -7,6 +7,10 @@ import { createServer } from "../worker/server";
 import { ClaimDatabase } from "../storage/sqlite";
 import { generateRulesFile } from "../rules/generator";
 import { searchCommand } from "./search";
+import { exportCommand } from "./export";
+import { importCommand } from "./import";
+import { doctorCommand } from "./doctor";
+import { configCommand } from "./config";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -177,12 +181,24 @@ async function main() {
       await startMcpServer();
       break;
     }
+    case "export":
+      await exportCommand(args.slice(1));
+      break;
+    case "import":
+      await importCommand(args.slice(1));
+      break;
+    case "doctor":
+      await doctorCommand();
+      break;
+    case "config":
+      await configCommand(args.slice(1));
+      break;
     case "uninstall":
       uninstall();
       break;
     default:
       console.log(`Unknown command: ${command}`);
-      console.log("Usage: claim [init|status|serve|hook|search|sweep|mcp|version|uninstall]");
+      console.log("Usage: claim [init|status|serve|hook|search|sweep|export|import|doctor|config|mcp|version|uninstall]");
       process.exit(1);
   }
 }
