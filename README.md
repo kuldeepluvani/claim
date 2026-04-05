@@ -34,18 +34,18 @@ CLAIM captures what you learn while coding with AI and turns it into a searchabl
 
 ## Why CLAIM?
 
-[claude-mem](https://github.com/anthropics/claude-mem) put AI memory on the map. CLAIM takes a different approach.
+Most AI memory tools record raw observations into opaque databases. CLAIM is different — it builds **structured knowledge** you can see, search, and own.
 
-| | claude-mem | **CLAIM** |
-|:---|:---|:---|
-| **Dependencies** | Python + ChromaDB + 13 packages | **2 packages. Bun only.** |
-| **Storage** | Opaque SQLite + vector DB | **Markdown you own** + SQLite |
-| **Structure** | Flat observations | **Knowledge graph** (entities + relationships) |
-| **Vault** | None | **Obsidian-native** routing |
-| **Visualization** | Observation list | **D3 graph + timeline + search** |
-| **License** | AGPL-3.0 | **MIT** |
-| **Token cost** | Compresses every session | **Smart: only on sweep cycles** |
-| **Install** | `npx claude-mem install` | **`npx claim`** |
+| Feature | CLAIM |
+|:---|:---|
+| **Dependencies** | 2 packages. Bun only. No Python, no vector DB. |
+| **Storage** | Markdown you own + SQLite for speed |
+| **Structure** | Knowledge graph with entities + relationships |
+| **Vault integration** | Obsidian-native routing to your vaults |
+| **Visualization** | D3 force-directed graph + timeline + search |
+| **License** | MIT — use it anywhere |
+| **Token cost** | Smart: only on sweep cycles, not every session |
+| **Install** | `npx claim` — one command, done |
 
 ---
 
@@ -87,7 +87,7 @@ Time to value: **60 seconds**.
 
 **Privacy-First** -- `<private>` tags, auto-redact `.env`/credentials, zero telemetry.
 
-**Export/Import** -- Portable bundles. Migrate from claude-mem or CLAIM v2.
+**Export/Import** -- Portable knowledge bundles. Migrate from CLAIM v2 or import any markdown.
 
 ---
 
@@ -136,7 +136,7 @@ Hooks fire on session start, stop, tool use, and subagent events. The worker pro
 | `claim doctor` | Diagnose issues with hooks, worker, database, config. |
 | `claim config` | View or update configuration. |
 | `claim export` | Export knowledge to a portable bundle. |
-| `claim import` | Import from a bundle or migrate from v2/claude-mem. |
+| `claim import` | Import from a bundle or migrate from v2. |
 | `claim mcp` | Start the MCP server for IDE integration. |
 | `claim hook` | Manually trigger a hook event for testing. |
 | `claim version` | Print version. |
