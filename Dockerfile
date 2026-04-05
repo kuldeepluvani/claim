@@ -25,12 +25,12 @@ RUN bun install --frozen-lockfile
 
 COPY src/ ./src/
 COPY tsconfig.json ./
+COPY scripts/ ./scripts/
 
 # Build CLAIM
 RUN bun run build
 
 # Make claim CLI available globally
-RUN ln -s /app/src/cli/index.ts /usr/local/bin/claim-dev
 RUN echo '#!/bin/bash\nbun run /app/src/cli/index.ts "$@"' > /usr/local/bin/claim && chmod +x /usr/local/bin/claim
 
 # Create sample git project for testing
@@ -68,4 +68,4 @@ EXPOSE 2626 2627
 WORKDIR /workspace/sample-project
 
 # Entry: start CLAIM worker in background, drop to shell
-CMD ["bash", "-c", "claim init && claim serve & sleep 2 && echo '\\n\\n🧠 CLAIM v3 Test Environment Ready\\n\\n  Web UI:  http://localhost:2626\\n  Worker:  Running on port 2626\\n  MCP:     claim mcp (stdio)\\n\\n  Sample projects:\\n    /workspace/sample-project  (auth-service)\\n    /workspace/api-gateway     (kong gateway)\\n\\n  Run: claim status\\n  Run: claim doctor\\n  Run: claude (to start Claude Code CLI)\\n\\n' && exec bash"]
+CMD ["bash", "-c", "claim init && claim serve & sleep 2 && echo '\\n\\n🧠 CLAIM v3 Test Environment Ready\\n\\n  Web UI:  http://localhost:2626\\n  Worker:  Running on port 2626\\n\\n  Sample projects:\\n    /workspace/sample-project  (auth-service)\\n    /workspace/api-gateway     (kong gateway)\\n\\n  Step 1: bash /app/scripts/seed-sample-data.sh\\n  Step 2: Open http://localhost:2626\\n  Step 3: claude (browser auth will open)\\n\\n' && exec bash"]
