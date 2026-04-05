@@ -43,8 +43,12 @@ const HOOK_EVENTS: Array<{ event: string; command: string; matcher: string }> = 
   { event: "SessionEnd", command: "claim hook session-end", matcher: "" },
 ];
 
-function isClaimMatcher(entry: HookMatcher): boolean {
-  return entry.hooks?.some((h) => h.command?.startsWith("claim hook")) ?? false;
+function isClaimMatcher(entry: any): boolean {
+  // New format: { matcher: "...", hooks: [{ command: "claim hook ..." }] }
+  if (entry.hooks?.some?.((h: any) => h.command?.startsWith("claim hook"))) return true;
+  // Old v1 format: { type: "command", command: "claim hook ..." } — clean these up too
+  if (entry.command?.startsWith("claim hook")) return true;
+  return false;
 }
 
 function readSettings(settingsPath: string): Settings {
