@@ -24,6 +24,10 @@ export function createServer(options: ServerOptions): { stop: () => void; port: 
           if (path === "/api/status") return routes.status();
           if (path === "/api/observations") return routes.observations(url);
           if (path === "/api/search") return routes.search(url);
+          if (path === "/api/graph/stats") return routes.graphStats();
+          if (path === "/api/graph/entities") return routes.graphEntities(url);
+          if (path === "/api/graph/entity") return routes.graphEntity(url);
+          if (path === "/api/graph/relationships") return routes.graphRelationships(url);
         }
 
         // POST routes

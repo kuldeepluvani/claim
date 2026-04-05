@@ -24,6 +24,26 @@ export function claimGet(db: ClaimDatabase, ids: string[]) {
   return db.getObservationsByIds(ids);
 }
 
+export function claimGraph(db: ClaimDatabase, entityName: string) {
+  const entity = db.getEntityByName(entityName);
+  if (!entity) return { found: false, entity: null, relationships: [], related: [] };
+
+  const graph = db.getEntityGraph(entity.id);
+  if (!graph) return { found: false, entity: null, relationships: [], related: [] };
+
+  return {
+    found: true,
+    entity: graph.entity,
+    relationships: graph.relationships.map((r) => ({
+      rel_type: r.rel_type,
+      source: r.source_name,
+      target: r.target_name,
+      confidence: r.confidence,
+    })),
+    related: graph.related_entities.map((e) => ({ name: e.name, type: e.type })),
+  };
+}
+
 function compact(obs: Observation) {
   return {
     id: obs.id,

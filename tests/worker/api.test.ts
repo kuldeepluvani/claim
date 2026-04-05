@@ -128,6 +128,31 @@ describe("Worker API", () => {
     expect(body.context).toContain("test-repo");
   });
 
+  it("GET /api/graph/stats returns entity/relationship counts", async () => {
+    const res = await fetch(`${BASE}/api/graph/stats`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(typeof body.entities).toBe("number");
+    expect(typeof body.relationships).toBe("number");
+  });
+
+  it("GET /api/graph/entities returns entity list", async () => {
+    const res = await fetch(`${BASE}/api/graph/entities`);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body.entities)).toBe(true);
+  });
+
+  it("GET /api/graph/entity returns 404 when not found", async () => {
+    const res = await fetch(`${BASE}/api/graph/entity?name=nonexistent`);
+    expect(res.status).toBe(404);
+  });
+
+  it("GET /api/graph/relationships requires entity_id", async () => {
+    const res = await fetch(`${BASE}/api/graph/relationships`);
+    expect(res.status).toBe(400);
+  });
+
   it("returns 404 for unknown routes", async () => {
     const res = await fetch(`${BASE}/unknown`);
     expect(res.status).toBe(404);

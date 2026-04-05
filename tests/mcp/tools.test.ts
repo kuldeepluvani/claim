@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { unlinkSync, existsSync } from "fs";
 import { ClaimDatabase } from "../../src/storage/sqlite";
-import { claimSearch, claimTimeline, claimGet } from "../../src/mcp/tools";
+import { claimSearch, claimTimeline, claimGet, claimGraph } from "../../src/mcp/tools";
 import type { Observation } from "../../src/shared/types";
 
 const TEST_DB = "/tmp/claim-mcp-tools-test.db";
@@ -128,6 +128,39 @@ describe("MCP tools", () => {
       const results = claimGet(db, ["obs-1", "nonexistent"]);
       expect(results.length).toBe(1);
       expect(results[0].id).toBe("obs-1");
+    });
+  });
+
+  describe("claimGraph", () => {
+    it("returns entity with relationships when found", () => {
+      const entityId = db.upsertEntity({ name: "claim", type: "service" });
+      const relatedId = db.upsertEntity({ name: "sqlite", type: "technology" });
+      db.insertRelationship({
+        source_id: entityId,
+        target_id: relatedId,
+        rel_type: "uses",
+        confidence: 0.9,
+      });
+
+      const result = claimGraph(db, "claim");
+      expect(result.found).toBe(true);
+      expect(result.entity!.name).toBe("claim");
+      expect(result.relationships.length).toBe(1);
+      expect(result.relationships[0].rel_type).toBe("uses");
+      expect(result.relationships[0].source).toBe("claim");
+      expect(result.relationships[0].target).toBe("sqlite");
+      expect(result.relationships[0].confidence).toBe(0.9);
+      expect(result.related.length).toBe(1);
+      expect(result.related[0].name).toBe("sqlite");
+      expect(result.related[0].type).toBe("technology");
+    });
+
+    it("returns found:false when entity doesn't exist", () => {
+      const result = claimGraph(db, "nonexistent-entity");
+      expect(result.found).toBe(false);
+      expect(result.entity).toBeNull();
+      expect(result.relationships).toEqual([]);
+      expect(result.related).toEqual([]);
     });
   });
 

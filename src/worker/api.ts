@@ -108,5 +108,39 @@ export function createRoutes(db: ClaimDatabase) {
     hookStop(_body: Record<string, unknown>): Response {
       return Response.json({ received: true });
     },
+
+    graphStats(): Response {
+      const stats = db.getGraphStats();
+      return Response.json(stats);
+    },
+
+    graphEntities(url: URL): Response {
+      const type = url.searchParams.get("type") as import("../shared/types").EntityType | null;
+      const limit = parseInt(url.searchParams.get("limit") || "100", 10);
+      const entities = db.getEntities(type || undefined, limit);
+      return Response.json({ entities });
+    },
+
+    graphEntity(url: URL): Response {
+      const name = url.searchParams.get("name");
+      if (!name) {
+        return Response.json({ error: "name parameter required" }, { status: 400 });
+      }
+      const entity = db.getEntityByName(name);
+      if (!entity) {
+        return Response.json({ error: "entity not found" }, { status: 404 });
+      }
+      const graph = db.getEntityGraph(entity.id);
+      return Response.json(graph);
+    },
+
+    graphRelationships(url: URL): Response {
+      const entityId = url.searchParams.get("entity_id");
+      if (!entityId) {
+        return Response.json({ error: "entity_id parameter required" }, { status: 400 });
+      }
+      const relationships = db.getRelationshipsFor(entityId);
+      return Response.json({ relationships });
+    },
   };
 }

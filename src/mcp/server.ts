@@ -3,7 +3,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { ClaimDatabase } from "../storage/sqlite";
 import { PATHS } from "../shared/paths";
-import { claimSearch, claimTimeline, claimGet } from "./tools";
+import { claimSearch, claimTimeline, claimGet, claimGraph } from "./tools";
 
 export async function startMcpServer() {
   const db = new ClaimDatabase(PATHS.dbFile);
@@ -50,6 +50,18 @@ export async function startMcpServer() {
     async (args) => {
       const results = claimGet(db, args.ids);
       return { content: [{ type: "text" as const, text: JSON.stringify(results, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "claim_graph",
+    "Query knowledge graph — find entity and its relationships",
+    {
+      entity: z.string(),
+    },
+    async (args) => {
+      const result = claimGraph(db, args.entity);
+      return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
     }
   );
 
