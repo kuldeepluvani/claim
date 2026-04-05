@@ -6,6 +6,7 @@ import { handleHookCli, parseHookStdin } from "../hooks/handler";
 import { createServer } from "../worker/server";
 import { ClaimDatabase } from "../storage/sqlite";
 import { generateRulesFile } from "../rules/generator";
+import { searchCommand } from "./search";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -128,12 +129,20 @@ async function main() {
     case "version":
       console.log("claim v3.0.0-alpha.1");
       break;
+    case "search":
+      await searchCommand(args.slice(1));
+      break;
+    case "mcp": {
+      const { startMcpServer } = await import("../mcp/server");
+      await startMcpServer();
+      break;
+    }
     case "uninstall":
       uninstall();
       break;
     default:
       console.log(`Unknown command: ${command}`);
-      console.log("Usage: claim [init|status|serve|hook|version|uninstall]");
+      console.log("Usage: claim [init|status|serve|hook|search|mcp|version|uninstall]");
       process.exit(1);
   }
 }
