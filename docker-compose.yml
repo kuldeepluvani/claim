@@ -1,0 +1,20 @@
+services:
+  claim-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: claim-v3-test
+    ports:
+      - "2626:2626"   # CLAIM Web UI + Worker API
+      - "2627:2627"   # CLAIM MCP Server
+    volumes:
+      # Mount your Anthropic API key for Claude Code CLI
+      - ${HOME}/.claude:/root/.claude-host:ro
+    environment:
+      # Claude Code CLI needs an API key — set via env or mount
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Ensure CLAIM uses the right data dir inside container
+      - CLAIM_DATA_DIR=/root/.claim
+    stdin_open: true
+    tty: true
+    working_dir: /workspace/sample-project
