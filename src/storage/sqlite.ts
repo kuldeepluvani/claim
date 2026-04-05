@@ -346,6 +346,50 @@ export class ClaimDatabase {
     return { entities: ent.count, relationships: rel.count };
   }
 
+  // --- Sweep helpers ---
+
+  getUnsweptObservations(limit: number): Observation[] {
+    const rows = this.db
+      .query(
+        `SELECT * FROM observations WHERE is_swept = 0 AND is_private = 0
+         ORDER BY timestamp ASC LIMIT $limit`
+      )
+      .all({ $limit: limit }) as Record<string, unknown>[];
+
+    return rows.map((row) => ({
+      ...row,
+      is_swept: row.is_swept === 1,
+      is_private: row.is_private === 1,
+    })) as Observation[];
+  }
+
+  markObservationSwept(id: string): void {
+    this.db
+      .query("UPDATE observations SET is_swept = 1 WHERE id = $id")
+      .run({ $id: id });
+  }
+
+  pruneSweptObservations(olderThanDays: number): number {
+    // Count before delete
+    const before = this.db
+      .query(
+        `SELECT COUNT(*) as count FROM observations WHERE is_swept = 1
+         AND timestamp < datetime('now', '-' || $days || ' days')`
+      )
+      .get({ $days: olderThanDays }) as { count: number };
+
+    if (before.count === 0) return 0;
+
+    this.db
+      .query(
+        `DELETE FROM observations WHERE is_swept = 1
+         AND timestamp < datetime('now', '-' || $days || ' days')`
+      )
+      .run({ $days: olderThanDays });
+
+    return before.count;
+  }
+
   close(): void {
     this.db.close();
   }
