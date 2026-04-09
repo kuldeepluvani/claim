@@ -133,23 +133,43 @@
       const [graphStats, setGraphStats] = useState(null);
       const [recent, setRecent] = useState(null);
       const [loading, setLoading] = useState(true);
+      const [sweepState, setSweepState] = useState('idle'); // idle | running | done | error
+      const [sweepResult, setSweepResult] = useState(null);
+
+      async function loadData() {
+        const [s, g, r] = await Promise.all([
+          api('/api/status'),
+          api('/api/graph/stats'),
+          api('/api/timeline?limit=15'),
+        ]);
+        setStatus(s);
+        setGraphStats(g);
+        setRecent(r);
+        setLoading(false);
+      }
 
       useEffect(() => {
-        async function load() {
-          const [s, g, r] = await Promise.all([
-            api('/api/status'),
-            api('/api/graph/stats'),
-            api('/api/timeline?limit=15'),
-          ]);
-          setStatus(s);
-          setGraphStats(g);
-          setRecent(r);
-          setLoading(false);
-        }
-        load();
-        const iv = setInterval(load, 15000);
+        loadData();
+        const iv = setInterval(loadData, 15000);
         return () => clearInterval(iv);
       }, []);
+
+      async function runSweep() {
+        setSweepState('running');
+        setSweepResult(null);
+        try {
+          const res = await fetch('/api/sweep', { method: 'POST' });
+          if (!res.ok) throw new Error('Sweep failed');
+          const data = await res.json();
+          setSweepResult(data);
+          setSweepState('done');
+          loadData(); // refresh stats
+          setTimeout(() => setSweepState('idle'), 8000);
+        } catch (err) {
+          setSweepState('error');
+          setTimeout(() => setSweepState('idle'), 5000);
+        }
+      }
 
       if (loading) return html`<div class="p-6 grid grid-cols-5 gap-4">${[1,2,3,4,5].map(() => html`<${LoadingCard} />`)}</div>`;
 
@@ -169,15 +189,51 @@
 
       const observations = recent?.observations || [];
 
+      const sweepBtnClass = {
+        idle: 'bg-claim hover:bg-claim-dark text-white border-claim-dark',
+        running: 'bg-gray-700 text-gray-400 border-gray-600 cursor-not-allowed',
+        done: 'bg-green-700 hover:bg-green-600 text-white border-green-600',
+        error: 'bg-red-700 text-white border-red-600',
+      }[sweepState];
+
+      const sweepBtnText = {
+        idle: 'Run Sweep',
+        running: 'Sweeping...',
+        done: 'Sweep Complete',
+        error: 'Sweep Failed',
+      }[sweepState];
+
       return html`
         <div class="p-6">
-          <div class="grid grid-cols-5 gap-4 mb-8">
+          <div class="grid grid-cols-5 gap-4 mb-6">
             ${cards.map(c => html`
               <div class="bg-gradient-to-br ${c.color} rounded-lg p-5 border border-gray-700/50">
                 <div class="text-3xl font-bold mb-1">${c.value}</div>
                 <div class="text-sm text-gray-300">${c.label}</div>
               </div>
             `)}
+          </div>
+
+          <div class="flex items-center gap-4 mb-6 bg-gray-900 rounded-lg border border-gray-800 p-4">
+            <div class="flex-1">
+              <div class="text-sm font-medium text-gray-300">Sweep</div>
+              <div class="text-xs text-gray-500">Compress observations, extract entities & relationships, write vault notes</div>
+            </div>
+            <button
+              class="px-5 py-2 rounded-lg text-sm font-medium border transition-all duration-200 ${sweepBtnClass}"
+              onClick=${runSweep}
+              disabled=${sweepState === 'running'}>
+              ${sweepState === 'running' ? html`<span class="inline-block w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin mr-2 align-middle"></span>` : null}
+              ${sweepBtnText}
+            </button>
+            ${sweepResult && sweepState === 'done' ? html`
+              <div class="flex gap-3 text-xs text-gray-400">
+                <span>${sweepResult.observations_processed} obs</span>
+                <span>${sweepResult.entities_extracted} entities</span>
+                <span>${sweepResult.relationships_extracted} rels</span>
+                <span>${sweepResult.vault_notes_written} notes</span>
+              </div>
+            ` : null}
           </div>
 
           <h3 class="text-lg font-semibold mb-4 text-gray-200">Recent Activity</h3>

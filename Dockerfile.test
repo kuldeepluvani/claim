@@ -1,0 +1,51 @@
+FROM oven/bun:1.3-debian
+
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    ca-certificates \
+    gnupg \
+    openssh-client \
+    sqlite3 \
+    jq \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Claude Code CLI
+RUN npm install -g @anthropic-ai/claude-code
+
+RUN mkdir -p /root/.claim /root/.claude /vault /workspace
+
+# Inspection helpers
+RUN echo '#!/bin/bash\n\
+echo "=== CLAIM Data Directory ==="\n\
+ls -lah /root/.claim/ 2>/dev/null || echo "  (empty)"\n\
+echo ""\n\
+echo "=== SQLite Tables ==="\n\
+sqlite3 /root/.claim/claim.db ".tables" 2>/dev/null || echo "  (no database)"\n\
+echo ""\n\
+echo "=== Observations ==="\n\
+sqlite3 /root/.claim/claim.db "SELECT id, type, category, tool_name, substr(content,1,80) as content_preview, repo, is_swept FROM observations ORDER BY timestamp DESC LIMIT 20;" 2>/dev/null || echo "  (none)"\n\
+echo ""\n\
+echo "=== Sessions ==="\n\
+sqlite3 /root/.claim/claim.db "SELECT id, repo, branch, started_at, observation_count, knowledge_type FROM sessions ORDER BY started_at DESC LIMIT 10;" 2>/dev/null || echo "  (none)"\n\
+echo ""\n\
+echo "=== Entities ==="\n\
+sqlite3 /root/.claim/claim.db "SELECT id, name, type, observation_count, aliases FROM entities ORDER BY observation_count DESC LIMIT 20;" 2>/dev/null || echo "  (none)"\n\
+echo ""\n\
+echo "=== Relationships ==="\n\
+sqlite3 /root/.claim/claim.db "SELECT r.rel_type, e1.name as source, e2.name as target, r.confidence FROM relationships r JOIN entities e1 ON r.source_id=e1.id JOIN entities e2 ON r.target_id=e2.id LIMIT 20;" 2>/dev/null || echo "  (none)"\n\
+echo ""\n\
+echo "=== Database Size ==="\n\
+du -sh /root/.claim/claim.db 2>/dev/null || echo "  (no database)"' > /usr/local/bin/claim-inspect && chmod +x /usr/local/bin/claim-inspect
+
+RUN echo '#!/bin/bash\nsqlite3 /root/.claim/claim.db ".schema"' > /usr/local/bin/claim-schema && chmod +x /usr/local/bin/claim-schema
+
+EXPOSE 2626 2627
+
+WORKDIR /workspace
+
+CMD ["bash"]

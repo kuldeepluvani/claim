@@ -1,0 +1,23 @@
+services:
+  claim-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: claim-test-lab
+    ports:
+      - "2626:2626"
+      - "2627:2627"
+    volumes:
+      - ~/.ssh:/root/.ssh:ro
+      - ~/.gitconfig:/root/.gitconfig:ro
+      - claim-data:/root/.claim
+      - claim-vault:/vault
+    environment:
+      - GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no
+    stdin_open: true
+    tty: true
+    working_dir: /workspace
+
+volumes:
+  claim-data:
+  claim-vault:
